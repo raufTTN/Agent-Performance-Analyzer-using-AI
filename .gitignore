@@ -1,0 +1,15 @@
+cat << 'EOF' > .gitignore
+# Python Virtual Environments
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Local Operations Relational & Staging Data (Protects Company CSVs)
+data/*.db
+data/*.csv
+reports/*.html
+
+# Streamlit Local Configurations & Cache
+.streamlit/
+EOF
