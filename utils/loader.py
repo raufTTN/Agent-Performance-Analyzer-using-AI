@@ -42,10 +42,11 @@ class LegacyDataStagingGateway:
                     cursor.execute("""
                         INSERT INTO tickets (
                             ticket_id, created_time, resolved_time, subject, description,
-                            priority, agent, resolution_applied, resolution_note, status,
+                            priority, company, agent, resolution_applied, resolution_note, status,
                             effort_mins, resolution_hours, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT(ticket_id) DO UPDATE SET
+                            company=excluded.company,
                             agent=excluded.agent,
                             status=excluded.status,
                             priority=excluded.priority,
@@ -55,6 +56,7 @@ class LegacyDataStagingGateway:
                     """, (
                         t_id, row.get("Created Time"), row.get("Resolved Time"),
                         row.get("Subject"), row.get("Description"), row.get("Priority"),
+                        str(row.get("Company", row.get("Companies", "Unknown Company"))).strip(), # NEW: Capturing Company
                         str(row.get("Agent")).strip(), row.get("Resolution Applied"), row.get("Resolution Note"),
                         str(row.get("Status")), 
                         float(effort_val if pd.notna(effort_val) else 0.0),

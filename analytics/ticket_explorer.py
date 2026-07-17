@@ -37,13 +37,12 @@ def show_ai_investigator_ui(df: pd.DataFrame):
             m4.metric("Effort Required (Mins)", f"{effort_mins:.1f} Mins")
             m5.metric("Ticket State Status", status)
             
-            # FIXED: Changed unsafe_allowed_html to unsafe_allow_html
             st.markdown("<br>", unsafe_allow_html=True)
             
             col_actions1, col_actions2 = st.columns(2)
             
             with col_actions1:
-                if st.button("🚀 Execute Forensic Ingestion Audit", use_container_width=True):
+                if st.button("🚀 Execute Forensic Ingestion Audit", width="stretch"):
                     with st.spinner("Invoking local LLM model weights..."):
                         analyzer = LocalTicketAnalyzer()
                         findings = analyzer.run_ticket_forensics(ticket)
@@ -65,7 +64,7 @@ def show_ai_investigator_ui(df: pd.DataFrame):
                                 st.code(findings.get("Raw"))
                                 
             with col_actions2:
-                if st.button("🧠 Surface Similar Historical Solved Tickets", use_container_width=True):
+                if st.button("🧠 Surface Similar Historical Solved Tickets", width="stretch"):
                     with st.spinner("Calculating vector similarity distances natively..."):
                         v_store = LocalTicketVectorStore()
                         similar_cases = v_store.surface_similar_resolutions(
