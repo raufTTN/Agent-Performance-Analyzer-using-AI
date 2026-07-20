@@ -50,8 +50,8 @@ def show_ai_investigator_ui(df: pd.DataFrame):
             col_actions1, col_actions2 = st.columns(2)
             
             with col_actions1:
-                if st.button("🚀 Execute Operational & Forensic Ingestion Audit", use_container_width=True):
-                    with st.spinner("Analyzing operational handoffs and engineering process slips..."):
+                if st.button("🚀 Execute Forensic Ingestion Audit", width="stretch"):
+                    with st.spinner("Invoking local LLM model weights..."):
                         analyzer = LocalTicketAnalyzer()
                         findings = analyzer.run_ticket_forensics(ticket)
                         
@@ -77,7 +77,7 @@ def show_ai_investigator_ui(df: pd.DataFrame):
                                 st.code(findings.get("Raw"))
                                 
             with col_actions2:
-                if st.button("🧠 Surface Similar Historical Solved Tickets", use_container_width=True):
+                if st.button("🧠 Surface Similar Historical Solved Tickets", width="stretch"):
                     with st.spinner("Calculating vector similarity distances natively..."):
                         v_store = LocalTicketVectorStore()
                         similar_cases = v_store.surface_similar_resolutions(

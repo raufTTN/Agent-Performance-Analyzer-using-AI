@@ -13,6 +13,7 @@ def initialize_database():
         cursor = conn.cursor()
         
         # Primary Relational Tickets Storage Table Structure
+        # Included company, ticket_type, category, and sub_category
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS tickets (
                 ticket_id TEXT PRIMARY KEY,
@@ -21,6 +22,10 @@ def initialize_database():
                 subject TEXT,
                 description TEXT,
                 priority TEXT,
+                company TEXT,
+                ticket_type TEXT,
+                category TEXT,
+                sub_category TEXT,
                 agent TEXT,
                 resolution_applied TEXT,
                 resolution_note TEXT,
@@ -35,8 +40,11 @@ def initialize_database():
         # Performance indexes for heavy data grouping runs
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_tickets_agent ON tickets(agent);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tickets_company ON tickets(company);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tickets_type ON tickets(ticket_type);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tickets_category ON tickets(category);")
         conn.commit()
 
 if __name__ == "__main__":
     initialize_database()
-    print("✅ Local SQLite database layer operational.")
+    print("✅ Local SQLite database layer operational with Company, Type, and Category tracking.")
