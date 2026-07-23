@@ -49,3 +49,17 @@ Your output must be strictly valid JSON. Do not include any pre-prose or post-pr
                 return {"error": f"Local model offline. Status Code: {response.status_code}"}
         except Exception as e:
             return {"error": f"Inference pipeline error: {str(e)}"}
+
+    def _parse_output(self, text: str) -> dict:
+        regions = {"Summary": "Incident Summary", "Root_Cause": "Root Cause Analysis", "Review": "Resolution Quality Review"}
+        patterns = {
+            "Summary": r"\[INCIDENT\s+SUMMARY\](.*?)(?=\[ROOT|$)",
+            "Root_Cause": r"\[ROOT\s+CAUSE\s+ANALYSIS\](.*?)(?=\[RESOLUTION|$)",
+            "Review": r"\[RESOLUTION\s+QUALITY\s+REVIEW\](.*)$"
+        }
+        extracted = {}
+        for k, p in patterns.items():
+            m = re.search(p, text, re.DOTALL | re.IGNORECASE)
+            extracted[regions[k]] = m.group(1).strip() if m else "Analysis section extraction boundary missed."
+        extracted["Raw"] = text
+        return extracted

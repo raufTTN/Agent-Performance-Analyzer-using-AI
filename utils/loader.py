@@ -84,6 +84,7 @@ import pandas as pd
 from datetime import datetime
 from utils.db_manager import get_db_connection
 
+
 class LegacyDataStagingGateway:
     @staticmethod
     def seed_database_from_csv(file_path: str) -> int:
@@ -94,10 +95,11 @@ class LegacyDataStagingGateway:
 
             with get_db_connection() as conn:
                 cursor = conn.cursor()
-
-                # Remove old dataset before importing new one
+                
+                # Clear previous dataset to allow clean switching
                 cursor.execute("DELETE FROM tickets")
-
+                conn.commit()
+                
                 now_str = datetime.utcnow().isoformat()
                 records_saved = 0
 
@@ -106,17 +108,13 @@ class LegacyDataStagingGateway:
 
                     if not t_id or t_id.lower() == "nan":
                         continue
-
                     effort_val = pd.to_numeric(
-                        row.get("Effort Required to Resolve (in mins)"),
-                        errors="coerce"
+                        row.get("Effort Required to Resolve (in mins)"), errors="coerce"
                     )
 
                     res_hours_val = pd.to_numeric(
-                        row.get("Resolution Hours"),
-                        errors="coerce"
+                        row.get("Resolution Hours"), errors="coerce"
                     )
-
                     created_raw = row.get("Created Time")
                     resolved_raw = row.get("Resolved Time")
 
@@ -134,15 +132,14 @@ class LegacyDataStagingGateway:
 
                             c_dt = datetime.strptime(str(created_raw).strip(), fmt)
                             r_dt = datetime.strptime(str(resolved_raw).strip(), fmt)
-
                             res_hours_val = max(
-                                0.0,
-                                (r_dt - c_dt).total_seconds() / 3600.0
+                                0.0, (r_dt - c_dt).total_seconds() / 3600.0
                             )
                         except Exception:
                             res_hours_val = 0.0
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
     INSERT INTO tickets (
         ticket_id,
         created_time,
@@ -151,6 +148,7 @@ class LegacyDataStagingGateway:
         description,
         priority,
         company,
+        ticket_type,
         agent,
         resolution_applied,
         resolution_note,
@@ -159,7 +157,7 @@ class LegacyDataStagingGateway:
         resolution_hours,
         updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
     ON CONFLICT(ticket_id) DO UPDATE SET
         created_time = excluded.created_time,
@@ -168,6 +166,7 @@ class LegacyDataStagingGateway:
         description = excluded.description,
         priority = excluded.priority,
         company = excluded.company,
+        ticket_type = excluded.ticket_type,
         agent = excluded.agent,
         resolution_applied = excluded.resolution_applied,
         resolution_note = excluded.resolution_note,
@@ -175,23 +174,29 @@ class LegacyDataStagingGateway:
         effort_mins = excluded.effort_mins,
         resolution_hours = excluded.resolution_hours,
         updated_at = excluded.updated_at
-""", (
-    t_id,
-    row.get("Created Time"),
-    row.get("Resolved Time"),
-    row.get("Subject"),
-    row.get("Description"),
-    row.get("Priority"),
-    str(row.get("Company", row.get("Companies", "Unknown Company"))).strip(),
-    str(row.get("Agent")).strip(),
-    row.get("Resolution Applied"),
-    row.get("Resolution Note"),
-    str(row.get("Status")),
-    float(effort_val if pd.notna(effort_val) else 0.0),
-    float(res_hours_val if pd.notna(res_hours_val) else 0.0),
-    now_str
-))
-
+""",
+                        (
+                            t_id,
+                            row.get("Created Time"),
+                            row.get("Resolved Time"),
+                            row.get("Subject"),
+                            row.get("Description"),
+                            row.get("Priority"),
+                            str(
+                                row.get(
+                                    "Company", row.get("Companies", "Unknown Company")
+                                )
+                            ).strip(),
+                            str(row.get("Type")).strip(),
+                            str(row.get("Agent")).strip(),
+                            row.get("Resolution Applied"),
+                            row.get("Resolution Note"),
+                            str(row.get("Status")),
+                            float(effort_val if pd.notna(effort_val) else 0.0),
+                            float(res_hours_val if pd.notna(res_hours_val) else 0.0),
+                            now_str,
+                        ),
+                    )
                     records_saved += 1
 
                 conn.commit()
