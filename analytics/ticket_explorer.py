@@ -5,7 +5,7 @@ from analytics.ticket_ai import LocalTicketAnalyzer
 from ai.rag_engine import LocalTicketVectorStore
 
 def show_ai_investigator_ui(df: pd.DataFrame):
-    """Renders the internal ticket audit panel augmented with detailed metric previews and RAG vector matching."""
+    """Renders the forensic analysis panel with operational handoff and mistake audit logic."""
     st.markdown("---")
     st.subheader("🔍 Deep Ticket Forensics Explorer & AI Auditor")
     st.caption("Secured local LLM processing layer + native vector lookup. Zero network dependencies.")
@@ -17,7 +17,7 @@ def show_ai_investigator_ui(df: pd.DataFrame):
         if not match.empty:
             ticket = match.iloc[0].to_dict()
             
-            # --- EXTRACT METRIC PARTICULARS ---
+            # --- EXTRACT METRICS ---
             priority = str(ticket.get('priority', 'N/A')).upper()
             status = str(ticket.get('status', 'N/A'))
             
@@ -32,12 +32,9 @@ def show_ai_investigator_ui(df: pd.DataFrame):
                     closure_time_str = "N/A"
                     
             effort_mins = ticket.get('effort_mins', 0.0)
-            
-            # Determine dynamic badge formatting for the SLA target status
             sla_breached = ticket.get('sla_breached', 0)
             sla_status_text = "🚨 BREACHED" if sla_breached == 1 else "✅ WITHIN SLA"
             
-            # --- RENDER ENHANCED METRIC HUD BLOCK ---
             st.info(f"**Loaded Case:** {ticket.get('subject')} | **Engineer Assigned:** {ticket.get('agent')}")
             
             # Use columns to present the structural metadata cleanly
@@ -54,6 +51,17 @@ def show_ai_investigator_ui(df: pd.DataFrame):
             
             st.markdown("<br>", unsafe_allow_html=True)
             
+            # --- AGENT NOTES & PRIVATE WORKLOG INPUT ---
+            st.markdown("##### 📝 Private Notes & Operational Worklogs")
+            default_note = ticket.get("notes") or ticket.get("resolution_note") or "This ticket was resolved in morning shift but still it was given in afternoon shift"
+            user_notes = st.text_area(
+                "Modify or paste agent notes / private worklogs here to audit for handoff or operational mistakes:",
+                value=default_note,
+                height=100
+            )
+            # Update ticket dict dynamically for prompt context injection
+            ticket["notes"] = user_notes
+            
             col_actions1, col_actions2 = st.columns(2)
             
             with col_actions1:
@@ -65,15 +73,20 @@ def show_ai_investigator_ui(df: pd.DataFrame):
                         if "error" in findings:
                             st.error(findings["error"])
                         else:
-                            st.success("Analysis Complete.")
+                            st.success("Operational & Technical Audit Complete.")
+                            
+                            # RENDER PROCESS AUDIT (Highlights handoff mistakes cleanly via warning banner)
+                            st.markdown("### ⚠️ Process Gaps & Handoff Audit")
+                            handoff_slip = findings.get("Handoff_Process_Mistakes") or "No obvious handoff mistakes detected in notes."
+                            st.warning(handoff_slip)
+                            
                             c1, c2 = st.columns(2)
                             with c1:
                                 st.markdown("### 📋 Incident Diagnostics")
-                                st.markdown(f"**Incident Summary:**\n{findings.get('Incident Summary')}")
-                                st.markdown(f"**Root Cause Analysis:**\n{findings.get('Root Cause Analysis')}")
+                                st.markdown(f"**Technical Root Cause:**\n{findings.get('Technical_Root_Cause')}")
                             with c2:
-                                st.markdown("### 🛠️ Handling Quality Review")
-                                st.markdown(f"**Resolution Quality Review:**\n{findings.get('Resolution Quality Review')}")
+                                st.markdown("### 🛠️ Process Improvement")
+                                st.markdown(f"**Workflow Optimization Plan:**\n{findings.get('Workflow_Optimization_Plan')}")
                                 
                             with st.expander("View Raw LLM Unparsed Generative Output"):
                                 st.code(findings.get("Raw"))

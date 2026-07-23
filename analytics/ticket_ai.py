@@ -1,58 +1,52 @@
+import json
 import requests
-import re
-from config import OLLAMA_API_URL, OLLAMA_MODEL, LLM_TIMEOUT, MAX_TEXT_WINDOW
+from config import OLLAMA_MODEL
 
 class LocalTicketAnalyzer:
-    def __init__(self):
-        self.url = OLLAMA_API_URL
+    """Invokes local model weights to perform deep technical and operational handoff audits."""
+    
+    def __init__(self, endpoint="http://localhost:11434/api/generate"):
+        self.endpoint = endpoint
         self.model = OLLAMA_MODEL
 
-    def _clean_and_truncate(self, text: str) -> str:
-        if not text:
-            return "N/A"
-        clean = re.sub(r"\s+", " ", str(text)).strip()
-        return clean[:MAX_TEXT_WINDOW] + "... [Truncated]" if len(clean) > MAX_TEXT_WINDOW else clean
-
     def run_ticket_forensics(self, ticket: dict) -> dict:
-        clean_desc = self._clean_and_truncate(ticket.get("description", ""))
-        clean_note = self._clean_and_truncate(ticket.get("resolution_note", ""))
+        private_notes = ticket.get("notes") or ticket.get("resolution_note") or "No worklogs captured."
         
         prompt = f"""
-You are a Senior SRE Director auditing ticket resolution metrics. Review the log details below and draft a brief summary matching the exact sections requested.
+You are an elite Site Reliability Engineering (SRE) Lead and Operational Auditor.
+Analyze the following incident metadata and private shift notes to identify operational mistakes, handoff gaps, or workflow process errors.
 
-TICKET FORENSICS
-- ID: {ticket.get('ticket_id')}
-- Assigned Agent: {ticket.get('agent')}
-- Priority: {ticket.get('priority')}
+### TICKET DATA
+- Ticket ID: {ticket.get('ticket_id')}
 - Subject: {ticket.get('subject')}
-- Description Logs: {clean_desc}
-- Resolution Applied: {clean_note}
+- Assigned Agent: {ticket.get('agent')}
+- Severity: {ticket.get('priority')}
+- Resolution Time: {ticket.get('resolution_hours')} hours
 
-REQUIRED RESPONSE FORMAT:
-Provide your analysis broken down into these EXACT 3 sections enclosed in brackets. Keep it concise.
+### AGENT WORKLOGS / PRIVATE NOTES
+"{private_notes}"
 
-[INCIDENT SUMMARY]
-(What broke and who it impacted)
+### INSTRUCTIONS
+Please analyze the data and notes, then construct a clear JSON response containing exactly these three markdown keys:
+1. "Handoff_Process_Mistakes": Audit the notes for mistakes like shift-overlap errors, tickets assigned after resolution, duplicate alerts, or incorrect shift routing.
+2. "Technical_Root_Cause": Identify what happened technically (e.g., memory utilization alerts, system state, alarms).
+3. "Workflow_Optimization_Plan": Provide actionable operational advice to prevent this specific handoff or technical slip in the future.
 
-[ROOT CAUSE ANALYSIS]
-(The technical underlying system failure)
-
-[RESOLUTION QUALITY REVIEW]
-(Critique of the fix path applied by the engineer)
+Your output must be strictly valid JSON. Do not include any pre-prose or post-prose outside the JSON structure.
 """
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0.1, "num_predict": 450}
-        }
-
         try:
-            res = requests.post(self.url, json=payload, timeout=LLM_TIMEOUT)
-            if res.status_code == 200:
-                raw = res.json().get("response", "")
-                return self._parse_output(raw)
-            return {"error": f"Ollama HTTP Failure: {res.status_code}"}
+            response = requests.post(
+                self.endpoint,
+                json={"model": self.model, "prompt": prompt, "format": "json", "stream": False},
+                timeout=30
+            )
+            if response.status_code == 200:
+                raw_txt = response.json().get("response", "{}")
+                parsed = json.loads(raw_txt)
+                parsed["Raw"] = raw_txt
+                return parsed
+            else:
+                return {"error": f"Local model offline. Status Code: {response.status_code}"}
         except Exception as e:
             return {"error": f"Inference pipeline error: {str(e)}"}
 
