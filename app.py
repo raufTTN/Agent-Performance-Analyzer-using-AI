@@ -296,11 +296,14 @@ sla_metrics = CoreSLADiagnosticEngine.fetch_sla_summary(filtered_df)
 avg_effort = (
     filtered_df["effort_mins"].mean() if "effort_mins" in filtered_df.columns else 0
 )
-avg_res_hours = (
-    filtered_df["resolution_hours"].mean()
-    if "resolution_hours" in filtered_df.columns
-    else 0
-)
+if selected_type == "All Types (SR & Incident)":
+    avg_res_hours = None
+else:
+    avg_res_hours = (
+        filtered_df["resolution_hours"].mean()
+        if "resolution_hours" in filtered_df.columns
+        else None
+    )
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Total Tickets", f"{len(filtered_df):,}")
@@ -310,7 +313,11 @@ c3.metric(
     f"{sla_metrics['breach_count']} Failed",
     delta_color="inverse",
 )
-c4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
+if avg_res_hours is None or pd.isna(avg_res_hours):
+    # c4.metric("Avg Resolution Duration", "")
+    pass
+else:
+    c4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
 
 
 # Section 3: SLA Compliance Target Ticket Data Grid 
