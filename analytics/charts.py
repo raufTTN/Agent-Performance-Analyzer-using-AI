@@ -14,7 +14,7 @@ def render_workload_allocation(df: pd.DataFrame):
     if df.empty or 'agent' not in df.columns:
         return None
     counts = df['agent'].value_counts().head(10).reset_index()
-    counts.columns = ['Agent', 'Active Tickets']
-    fig = px.bar(counts, x='Active Tickets', y='Agent', orientation='h', template='plotly_dark')
+    counts.columns = ['Agent', 'Tickets']
+    fig = px.bar(counts, x='Tickets', y='Agent', orientation='h', template='plotly_dark')
     fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=300)
     return fig

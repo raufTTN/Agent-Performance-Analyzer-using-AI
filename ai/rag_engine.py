@@ -63,4 +63,3 @@ class LocalTicketVectorStore:
                 "confidence": round(score * 100, 1)
             })
         return results
-

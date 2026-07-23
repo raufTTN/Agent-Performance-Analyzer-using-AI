@@ -54,6 +54,7 @@ Provide your analysis broken down into these EXACT 3 sections enclosed in bracke
                 return self._parse_output(raw)
             return {"error": f"Ollama HTTP Failure: {res.status_code}"}
         except Exception as e:
+<<<<<<< Updated upstream
             return {"error": f"Local LLM offline: {str(e)}"}
 
     def _parse_output(self, text: str) -> dict:
@@ -69,3 +70,6 @@ Provide your analysis broken down into these EXACT 3 sections enclosed in bracke
             extracted[regions[k]] = m.group(1).strip() if m else "Analysis section extraction boundary missed."
         extracted["Raw"] = text
         return extracted
+=======
+            return {"error": f"Inference pipeline error: {str(e)}"}
+>>>>>>> Stashed changes

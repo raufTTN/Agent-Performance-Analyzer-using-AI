@@ -25,10 +25,42 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+<<<<<<< Updated upstream
 # --- USER TRIGGERED INTERFACED DATA REFRESH GATE ---
 def run_system_sync_sequence():
     if Path(CSV_PATH).exists():
         LegacyDataStagingGateway.seed_database_from_csv(CSV_PATH)
+=======
+st.markdown(
+    """
+    <style>
+    /* Fix sidebar scrolling */
+    [data-testid="stSidebarUserContent"], [data-testid="stSidebarNav"] {
+        overflow-y: auto !important;
+        max-height: 100vh;
+    }
+    
+    /* Fix dropdown popup menus */
+    div[data-baseweb="popover"] {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    /* Reduce padding between sidebar elements */
+    [data-testid="stSidebarUserContent"] .stSelectbox {
+        margin-bottom: -15px !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+def run_system_sync_sequence(csv_path):
+    if Path(csv_path).exists():
+        LegacyDataStagingGateway.seed_database_from_csv(csv_path)
+
+>>>>>>> Stashed changes
     CoreSLADiagnosticEngine.execute_global_sla_audit()
 
 # --- SIDEBAR CONTROL FILTERS ---
@@ -87,10 +119,15 @@ selected_agent = st.sidebar.selectbox("Filter view context by Agent:", agent_opt
 priority_options = ["All Priorities"] + sorted(df_filtered_base["priority"].dropna().unique().tolist())
 selected_priority = st.sidebar.selectbox("Filter view context by Severity:", priority_options)
 
+effort_options = ["None", "1 min", "2 min", "3 min", "4 min", "5 min"]
+selected_effort_exclusion = st.sidebar.selectbox(
+    "Exclude Tickets by Effort (mins):", effort_options
+)
+
 # --- EXECUTE MULTI-FILTER ROUTING PARSING ---
 filtered_df = df_filtered_base.copy()
 
-# Apply Date Range filter
+# Apply Date Range filter   
 if isinstance(selected_date_range, tuple) and len(selected_date_range) == 2:
     start_date, end_date = selected_date_range
     filtered_df = filtered_df[
@@ -130,6 +167,16 @@ if selected_agent != "All Agents":
 # Apply Priority Filter
 if selected_priority != "All Priorities":
     filtered_df = filtered_df[filtered_df["priority"] == selected_priority]
+
+# Apply Effort Exclusion Filter
+if selected_effort_exclusion != "None":
+    if "effort_mins" in filtered_df.columns:
+        try:
+            exclude_mins = int(selected_effort_exclusion.split()[0])
+            effort_numeric = pd.to_numeric(filtered_df["effort_mins"], errors="coerce")
+            filtered_df = filtered_df[~(effort_numeric == exclude_mins)]
+        except Exception:
+            pass
 
 # Calculate rankings out of the scoped dataset window immediately, passing the context type
 rankings_df = OperationsLeaderboardScorer.compile_weighted_rankings(filtered_df, context_type=selected_type)
@@ -213,23 +260,63 @@ with h2:
 # Section 2: Executive KPI Cards Grid
 st.markdown("---")
 sla_metrics = CoreSLADiagnosticEngine.fetch_sla_summary(filtered_df)
+<<<<<<< Updated upstream
 avg_effort = filtered_df['effort_mins'].mean() if 'effort_mins' in filtered_df.columns else 0
 avg_res_hours = filtered_df['resolution_hours'].mean() if 'resolution_hours' in filtered_df.columns else 0
+=======
+avg_effort = (
+    filtered_df["effort_mins"].mean() if "effort_mins" in filtered_df.columns else 0
+)
+if selected_type == "All Types (SR & Incident)":
+    avg_res_hours = None
+else:
+    avg_res_hours = (
+        filtered_df["resolution_hours"].mean()
+        if "resolution_hours" in filtered_df.columns
+        else None
+    )
+>>>>>>> Stashed changes
 
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Total Incident Cases Scope", f"{len(filtered_df):,}")
+c1.metric("Total Tickets", f"{len(filtered_df):,}")
 c2.metric("SLA Compliance Rate Percentage", f"{sla_metrics['compliance_pct']}%")
+<<<<<<< Updated upstream
 c3.metric("Total SLA Resolution Breaches", f"{sla_metrics['breach_count']} Failed", delta_color="inverse")
 c4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
+=======
+c3.metric(
+    "Total SLA Resolution Breaches",
+    f"{sla_metrics['breach_count']} Failed",
+    delta_color="inverse",
+)
+if avg_res_hours is None or pd.isna(avg_res_hours):
+    # c4.metric("Avg Resolution Duration", "")
+    pass
+else:
+    c4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
+>>>>>>> Stashed changes
 
 
 # Section 3: SLA Compliance Target Ticket Data Grid
 st.markdown("---")
 st.subheader("📋 SLA Inception Status Tracking Tables")
 
+<<<<<<< Updated upstream
 columns_to_show = ["ticket_id", "subject", "agent", "priority", "resolution_hours", "status"]
+=======
+columns_to_show = [
+    "ticket_id",
+    "subject",
+    "ticket_type",
+    "agent",
+    "priority",
+    "resolution_hours",
+    "status",
+]
+>>>>>>> Stashed changes
 rename_map = {
     "ticket_id": "Ticket ID",
+    "ticket_type": "Ticket Type",
     "subject": "Case Subject",
     "agent": "Assigned SRE",
     "priority": "Severity Level",
@@ -315,5 +402,13 @@ show_ai_investigator_ui(filtered_df)
 st.markdown("---")
 st.subheader("📋 Automated Operations Executive Review Compiler")
 if st.button("📥 Compile Standalone Executive HTML Operations Review File"):
+<<<<<<< Updated upstream
     compiled_path = AutomatedReportGenerator.compile_executive_html(filtered_df)
     st.success(f"HTML executive review file saved successfully to: `{compiled_path}`")
+=======
+    # compiled_path = AutomatedReportGenerator.compile_executive_html(filtered_df)
+    report_path = AutomatedReportGenerator.compile_executive_html(
+        filtered_df, selected_agent
+    )
+    st.success(f"HTML executive review file saved successfully to: `{report_path}`")
+>>>>>>> Stashed changes
