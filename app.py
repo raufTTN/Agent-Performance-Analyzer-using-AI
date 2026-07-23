@@ -303,7 +303,7 @@ avg_res_hours = (
 )
 
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Total Incident Cases Scope", f"{len(filtered_df):,}")
+c1.metric("Total Tickets", f"{len(filtered_df):,}")
 c2.metric("SLA Compliance Rate Percentage", f"{sla_metrics['compliance_pct']}%")
 c3.metric(
     "Total SLA Resolution Breaches",
@@ -313,7 +313,7 @@ c3.metric(
 c4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
 
 
-# Section 3: SLA Compliance Target Ticket Data Grid
+# Section 3: SLA Compliance Target Ticket Data Grid 
 st.markdown("---")
 st.subheader("📋 SLA Inception Status Tracking Tables")
 
