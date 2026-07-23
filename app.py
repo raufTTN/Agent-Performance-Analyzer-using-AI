@@ -136,9 +136,9 @@ selected_agent = st.sidebar.selectbox("Filter view context by Agent:", agent_opt
 priority_options = ["All Priorities"] + sorted(df_filtered_base["priority"].dropna().unique().tolist())
 selected_priority = st.sidebar.selectbox("Filter view context by Severity:", priority_options)
 
-effort_options = ["None", "1 min", "2 min", "3 min", "4 min", "5 min"]
-selected_effort_exclusion = st.sidebar.selectbox(
-    "Exclude Tickets by Effort (mins):", effort_options
+effort_options = ["1 min", "2 min", "3 min", "4 min", "5 min"]
+selected_effort_exclusion = st.sidebar.multiselect(
+    "Exclude Tickets by Effort (mins):", effort_options, default=[]
 )
 
 # --- EXECUTE MULTI-FILTER ROUTING PARSING ---
@@ -186,12 +186,12 @@ if selected_priority != "All Priorities":
     filtered_df = filtered_df[filtered_df["priority"] == selected_priority]
 
 # Apply Effort Exclusion Filter
-if selected_effort_exclusion != "None":
+if selected_effort_exclusion:
     if "effort_mins" in filtered_df.columns:
         try:
-            exclude_mins = int(selected_effort_exclusion.split()[0])
+            exclude_mins = [int(opt.split()[0]) for opt in selected_effort_exclusion]
             effort_numeric = pd.to_numeric(filtered_df["effort_mins"], errors="coerce")
-            filtered_df = filtered_df[~(effort_numeric == exclude_mins)]
+            filtered_df = filtered_df[~effort_numeric.isin(exclude_mins)]
         except Exception:
             pass
 
