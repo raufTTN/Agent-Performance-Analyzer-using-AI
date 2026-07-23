@@ -325,14 +325,31 @@ with tab_breached:
 
 # Section 4: Systemic Root Cause & Security Compliance Diagnostics
 st.markdown("---")
-st.subheader("🛡️ Systemic Infrastructure Root Cause & Security Compliance Diagnostics")
+st.subheader("🛡️ Infrastructure Noise Clusters & Top 5 Systemic Alerts")
 st.caption("Scans high-volume repeating noise clusters to construct air-gapped security playbooks and engineering efficiency strategies.")
 
 if st.button("🔮 Analyze Infrastructure Noise Clusters & Security Exposure"):
     with st.spinner("Extracting pattern matrices and driving local inference weights..."):
         rc_engine = SystemicRootCauseEngine()
         strategic_review = rc_engine.cluster_and_analyze_patterns(filtered_df)
-        st.info(strategic_review)
+        
+        if isinstance(strategic_review, dict):
+            if "error" in strategic_review:
+                st.warning(strategic_review["error"])
+            else:
+                st.markdown("#### 🚨 Top 5 Noisy Alerts")
+                alerts_df = pd.DataFrame(strategic_review["top_alerts"])
+                alerts_df = alerts_df.rename(columns={
+                    "Target Company Context": "Company Name",
+                    "Total Occurrence Count": "Frequency Count"
+                })
+                st.dataframe(alerts_df, use_container_width=True, hide_index=True)
+                
+                st.markdown("#### 🧠 AI Security & Efficiency Impact Summary")
+                with st.expander("View Strategic Insights", expanded=True):
+                    st.info(strategic_review["insights"])
+        else:
+            st.info(strategic_review)
 
 
 # Section 5: Interactive Plotly Chart Columns Block
