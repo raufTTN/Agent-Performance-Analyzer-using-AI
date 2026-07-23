@@ -421,9 +421,38 @@ show_ai_investigator_ui(filtered_df)
 # Section 9: Automated Report Generation Block
 st.markdown("---")
 st.subheader("📋 Automated Operations Executive Review Compiler")
-if st.button("📥 Compile Standalone Executive HTML Operations Review File"):
-    # compiled_path = AutomatedReportGenerator.compile_executive_html(filtered_df)
-    report_path = AutomatedReportGenerator.compile_executive_html(
-        filtered_df, selected_agent
-    )
-    st.success(f"HTML executive review file saved successfully to: `{report_path}`")
+
+if st.button("📥 Generate Rich Executive Reports"):
+    with st.spinner("Analyzing operational footprints and generating AI remarks..."):
+        report_data = AutomatedReportGenerator.generate_rich_executive_report(filtered_df, selected_agent)
+        st.session_state["executive_report_data"] = report_data
+
+if "executive_report_data" in st.session_state:
+    report_data = st.session_state["executive_report_data"]
+    if "error" in report_data:
+        st.error(report_data["error"])
+    else:
+        st.success("Reports generated successfully! Select format to download:")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.download_button(
+                label="📥 Download Executive Review (HTML)",
+                data=report_data["html"],
+                file_name="executive_review.html",
+                mime="text/html",
+                use_container_width=True
+            )
+        
+        with col2:
+            if report_data["pdf"]:
+                st.download_button(
+                    label="📄 Download Executive Review (PDF)",
+                    data=report_data["pdf"],
+                    file_name="executive_review.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            else:
+                st.warning("PDF export requires xhtml2pdf package. Please run 'pip install xhtml2pdf'.")
+
