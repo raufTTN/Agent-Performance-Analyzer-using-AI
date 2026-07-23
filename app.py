@@ -327,6 +327,7 @@ st.subheader("📋 SLA Inception Status Tracking Tables")
 columns_to_show = [
     "ticket_id",
     "subject",
+    "ticket_type",
     "agent",
     "priority",
     "resolution_hours",
@@ -334,6 +335,7 @@ columns_to_show = [
 ]
 rename_map = {
     "ticket_id": "Ticket ID",
+    "ticket_type": "Ticket Type",
     "subject": "Case Subject",
     "agent": "Assigned SRE",
     "priority": "Severity Level",
