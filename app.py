@@ -58,9 +58,33 @@ def run_system_sync_sequence(csv_path):
 
 # --- SIDEBAR CONTROL FILTERS ---
 st.sidebar.header("🎛️ Operations Control Panel")
-if st.sidebar.button("🔄 Sync Local Data Layer Pipeline"):
-    with st.spinner("Seeding relational database tables from tickets.csv..."):
-        run_system_sync_sequence()
+
+# Discover CSV datasets
+data_dir = Path("data")
+csv_files = list(data_dir.glob("*.csv")) if data_dir.exists() else []
+
+# Handle empty or missing data folder
+if not csv_files:
+    csv_paths = [CSV_PATH]
+    csv_names = [Path(CSV_PATH).name]
+else:
+    csv_paths = [str(p) for p in csv_files]
+    csv_names = [p.name for p in csv_files]
+
+# Set default selection to tickets.csv if it exists
+default_idx = 0
+for idx, name in enumerate(csv_names):
+    if name == "tickets.csv":
+        default_idx = idx
+        break
+
+selected_csv_name = st.sidebar.selectbox("Select CSV Dataset:", csv_names, index=default_idx)
+selected_csv_path = csv_paths[csv_names.index(selected_csv_name)]
+st.session_state["selected_csv"] = selected_csv_path
+
+if st.sidebar.button("🔄 Sync Selected Dataset"):
+    with st.spinner(f"Seeding relational database tables from {selected_csv_name}..."):
+        run_system_sync_sequence(st.session_state["selected_csv"])
         st.sidebar.success("Local database synchronization complete.")
 
 # Read staging frame out of relational database storage
