@@ -25,12 +25,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-<<<<<<< Updated upstream
-# --- USER TRIGGERED INTERFACED DATA REFRESH GATE ---
-def run_system_sync_sequence():
-    if Path(CSV_PATH).exists():
-        LegacyDataStagingGateway.seed_database_from_csv(CSV_PATH)
-=======
 st.markdown(
     """
     <style>
@@ -60,7 +54,6 @@ def run_system_sync_sequence(csv_path):
     if Path(csv_path).exists():
         LegacyDataStagingGateway.seed_database_from_csv(csv_path)
 
->>>>>>> Stashed changes
     CoreSLADiagnosticEngine.execute_global_sla_audit()
 
 # --- SIDEBAR CONTROL FILTERS ---
@@ -260,10 +253,6 @@ with h2:
 # Section 2: Executive KPI Cards Grid
 st.markdown("---")
 sla_metrics = CoreSLADiagnosticEngine.fetch_sla_summary(filtered_df)
-<<<<<<< Updated upstream
-avg_effort = filtered_df['effort_mins'].mean() if 'effort_mins' in filtered_df.columns else 0
-avg_res_hours = filtered_df['resolution_hours'].mean() if 'resolution_hours' in filtered_df.columns else 0
-=======
 avg_effort = (
     filtered_df["effort_mins"].mean() if "effort_mins" in filtered_df.columns else 0
 )
@@ -275,15 +264,10 @@ else:
         if "resolution_hours" in filtered_df.columns
         else None
     )
->>>>>>> Stashed changes
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Total Tickets", f"{len(filtered_df):,}")
 c2.metric("SLA Compliance Rate Percentage", f"{sla_metrics['compliance_pct']}%")
-<<<<<<< Updated upstream
-c3.metric("Total SLA Resolution Breaches", f"{sla_metrics['breach_count']} Failed", delta_color="inverse")
-c4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
-=======
 c3.metric(
     "Total SLA Resolution Breaches",
     f"{sla_metrics['breach_count']} Failed",
@@ -294,16 +278,12 @@ if avg_res_hours is None or pd.isna(avg_res_hours):
     pass
 else:
     c4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
->>>>>>> Stashed changes
 
 
 # Section 3: SLA Compliance Target Ticket Data Grid
 st.markdown("---")
 st.subheader("📋 SLA Inception Status Tracking Tables")
 
-<<<<<<< Updated upstream
-columns_to_show = ["ticket_id", "subject", "agent", "priority", "resolution_hours", "status"]
-=======
 columns_to_show = [
     "ticket_id",
     "subject",
@@ -313,7 +293,6 @@ columns_to_show = [
     "resolution_hours",
     "status",
 ]
->>>>>>> Stashed changes
 rename_map = {
     "ticket_id": "Ticket ID",
     "ticket_type": "Ticket Type",
@@ -402,13 +381,8 @@ show_ai_investigator_ui(filtered_df)
 st.markdown("---")
 st.subheader("📋 Automated Operations Executive Review Compiler")
 if st.button("📥 Compile Standalone Executive HTML Operations Review File"):
-<<<<<<< Updated upstream
-    compiled_path = AutomatedReportGenerator.compile_executive_html(filtered_df)
-    st.success(f"HTML executive review file saved successfully to: `{compiled_path}`")
-=======
     # compiled_path = AutomatedReportGenerator.compile_executive_html(filtered_df)
     report_path = AutomatedReportGenerator.compile_executive_html(
         filtered_df, selected_agent
     )
     st.success(f"HTML executive review file saved successfully to: `{report_path}`")
->>>>>>> Stashed changes

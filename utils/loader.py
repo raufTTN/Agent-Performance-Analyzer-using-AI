@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 # import pandas as pd
 # from datetime import datetime
 # from utils.db_manager import get_db_connection
@@ -82,7 +80,6 @@
 #             return 0
 
 # Kaynat
->>>>>>> Stashed changes
 import pandas as pd
 from datetime import datetime
 from utils.db_manager import get_db_connection
@@ -105,15 +102,6 @@ class LegacyDataStagingGateway:
                     t_id = str(row.get("Ticket Id", row.get("ticket_id", ""))).strip()
                     if not t_id or t_id == "nan" or t_id == "":
                         continue
-<<<<<<< Updated upstream
-                    
-                    # Core Numeric Parse Gauges
-                    effort_val = pd.to_numeric(row.get("Effort Required to Resolve (in mins)"), errors='coerce')
-                    res_hours_val = pd.to_numeric(row.get("Resolution Hours"), errors='coerce')
-                    
-                    # Dynamic Fallback: Calculate hours from timestamps if column is missing/zero
-=======
-
                     effort_val = pd.to_numeric(
                         row.get("Effort Required to Resolve (in mins)"), errors="coerce"
                     )
@@ -121,8 +109,6 @@ class LegacyDataStagingGateway:
                     res_hours_val = pd.to_numeric(
                         row.get("Resolution Hours"), errors="coerce"
                     )
-
->>>>>>> Stashed changes
                     created_raw = row.get("Created Time")
                     resolved_raw = row.get("Resolved Time")
                     
@@ -132,38 +118,6 @@ class LegacyDataStagingGateway:
                             fmt = "%Y-%m-%d %H:%M:%S" if "-" in str(created_raw) else "%d/%m/%Y %H:%M"
                             c_dt = datetime.strptime(str(created_raw).strip(), fmt)
                             r_dt = datetime.strptime(str(resolved_raw).strip(), fmt)
-<<<<<<< Updated upstream
-                            calculated_hours = (r_dt - c_dt).total_seconds() / 3600.0
-                            res_hours_val = max(0.0, calculated_hours)
-                        except Exception:
-                            res_hours_val = 0.0
-                            
-                    cursor.execute("""
-                        INSERT INTO tickets (
-                            ticket_id, created_time, resolved_time, subject, description,
-                            priority, company, agent, resolution_applied, resolution_note, status,
-                            effort_mins, resolution_hours, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(ticket_id) DO UPDATE SET
-                            company=excluded.company,
-                            agent=excluded.agent,
-                            status=excluded.status,
-                            priority=excluded.priority,
-                            effort_mins=excluded.effort_mins,
-                            resolution_hours=excluded.resolution_hours,
-                            updated_at=excluded.updated_at
-                    """, (
-                        t_id, row.get("Created Time"), row.get("Resolved Time"),
-                        row.get("Subject"), row.get("Description"), row.get("Priority"),
-                        str(row.get("Company", row.get("Companies", "Unknown Company"))).strip(), # NEW: Capturing Company
-                        str(row.get("Agent")).strip(), row.get("Resolution Applied"), row.get("Resolution Note"),
-                        str(row.get("Status")), 
-                        float(effort_val if pd.notna(effort_val) else 0.0),
-                        float(res_hours_val if pd.notna(res_hours_val) else 0.0),
-                        now_str
-                    ))
-=======
-
                             res_hours_val = max(
                                 0.0, (r_dt - c_dt).total_seconds() / 3600.0
                             )
@@ -229,8 +183,6 @@ class LegacyDataStagingGateway:
                             now_str,
                         ),
                     )
-
->>>>>>> Stashed changes
                     records_saved += 1
                 conn.commit()
             return records_saved

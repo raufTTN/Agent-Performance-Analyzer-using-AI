@@ -30,16 +30,8 @@ SLA_TARGETS = {
 
 # Configurable Leaderboard Performance Matrix Tuning Weights
 SCORING_WEIGHTS = {
-<<<<<<< Updated upstream
-    "sla_compliance": 0.40,     # SLA Compliance carries the highest priority
-    "resolution_speed": 0.30,   # Shorter Resolution Hours increases score
-    "volume_impact": 0.20,       # Total count volume handled
-    "effort_efficiency": 0.10   # Shorter effort minutes per ticket handled
-}
-=======
     "sla_compliance": 0.40,  # SLA Compliance carries the highest priority
     "resolution_speed": 0.30,  # Shorter Resolution Hours increases score
     "volume_impact": 0.20,  # Total count volume handled
     "effort_efficiency": 0.10,  # Shorter effort minutes per ticket handled
 }
->>>>>>> Stashed changes
