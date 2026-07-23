@@ -8,7 +8,7 @@
 #         """Parses CSV layout rows, dynamically calculates missing metrics, and seeds SQLite."""
 #         try:
 #             df = pd.read_csv(file_path)
-#             df.columns = df.columns.str.strip() 
+#             df.columns = df.columns.str.strip()
 #             with get_db_connection() as conn:
 #                 cursor = conn.cursor()
 
@@ -23,20 +23,20 @@
 #             #     cursor = conn.cursor()
 #             #     now_str = datetime.utcnow().isoformat()
 #             #     records_saved = 0
-                
+
 #             #     for _, row in df.iterrows():
 #                     t_id = str(row.get("Ticket Id", row.get("ticket_id", ""))).strip()
 #                     if not t_id or t_id == "nan" or t_id == "":
 #                         continue
-                    
+
 #                     # Core Numeric Parse Gauges
 #                     effort_val = pd.to_numeric(row.get("Effort Required to Resolve (in mins)"), errors='coerce')
 #                     res_hours_val = pd.to_numeric(row.get("Resolution Hours"), errors='coerce')
-                    
+
 #                     # Dynamic Fallback: Calculate hours from timestamps if column is missing/zero
 #                     created_raw = row.get("Created Time")
 #                     resolved_raw = row.get("Resolved Time")
-                    
+
 #                     if (pd.isna(res_hours_val) or res_hours_val == 0.0) and pd.notna(created_raw) and pd.notna(resolved_raw):
 #                         try:
 #                             # Adapt dynamically to common Freshservice timestamp formats
@@ -47,7 +47,7 @@
 #                             res_hours_val = max(0.0, calculated_hours)
 #                         except Exception:
 #                             res_hours_val = 0.0
-                            
+
 #                     cursor.execute("""
 #                         INSERT INTO tickets (
 #                             ticket_id, created_time, resolved_time, subject, description,
@@ -67,7 +67,7 @@
 #                         row.get("Subject"), row.get("Description"), row.get("Priority"),
 #                         str(row.get("Company", row.get("Companies", "Unknown Company"))).strip(), # NEW: Capturing Company
 #                         str(row.get("Agent")).strip(), row.get("Resolution Applied"), row.get("Resolution Note"),
-#                         str(row.get("Status")), 
+#                         str(row.get("Status")),
 #                         float(effort_val if pd.notna(effort_val) else 0.0),
 #                         float(res_hours_val if pd.notna(res_hours_val) else 0.0),
 #                         now_str
@@ -197,6 +197,7 @@ class LegacyDataStagingGateway:
                             now_str,
                         ),
                     )
+
                     records_saved += 1
 
                 conn.commit()
