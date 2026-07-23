@@ -320,7 +320,7 @@ else:
     c4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
 
 
-# Section 3: SLA Compliance Target Ticket Data Grid 
+# Section 3: SLA Compliance Target Ticket Data Grid
 st.markdown("---")
 st.subheader("📋 SLA Inception Status Tracking Tables")
 
@@ -446,5 +446,8 @@ show_ai_investigator_ui(filtered_df)
 st.markdown("---")
 st.subheader("📋 Automated Operations Executive Review Compiler")
 if st.button("📥 Compile Standalone Executive HTML Operations Review File"):
-    compiled_path = AutomatedReportGenerator.compile_executive_html(filtered_df)
-    st.success(f"HTML executive review file saved successfully to: `{compiled_path}`")
+    # compiled_path = AutomatedReportGenerator.compile_executive_html(filtered_df)
+    report_path = AutomatedReportGenerator.compile_executive_html(
+        filtered_df, selected_agent
+    )
+    st.success(f"HTML executive review file saved successfully to: `{report_path}`")
