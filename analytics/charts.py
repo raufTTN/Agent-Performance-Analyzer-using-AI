@@ -1,4 +1,5 @@
 import pandas as pd
+# pyrefly: ignore [missing-import]
 import plotly.express as px
 
 def render_priority_distribution(df: pd.DataFrame):
