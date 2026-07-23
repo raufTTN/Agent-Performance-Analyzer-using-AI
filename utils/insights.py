@@ -77,6 +77,7 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
         # 6. PDF Generation Fallback
         pdf_bytes = None
         try:
+            # pyrefly: ignore [missing-import]
             from xhtml2pdf import pisa
             import io
             result = io.BytesIO()
