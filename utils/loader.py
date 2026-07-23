@@ -95,10 +95,11 @@ class LegacyDataStagingGateway:
 
             with get_db_connection() as conn:
                 cursor = conn.cursor()
-
-                # Remove old dataset before importing new one
+                
+                # Clear previous dataset to allow clean switching
                 cursor.execute("DELETE FROM tickets")
-
+                conn.commit()
+                
                 now_str = datetime.utcnow().isoformat()
                 records_saved = 0
 
@@ -107,7 +108,6 @@ class LegacyDataStagingGateway:
 
                     if not t_id or t_id.lower() == "nan":
                         continue
-
                     effort_val = pd.to_numeric(
                         row.get("Effort Required to Resolve (in mins)"), errors="coerce"
                     )
@@ -115,7 +115,6 @@ class LegacyDataStagingGateway:
                     res_hours_val = pd.to_numeric(
                         row.get("Resolution Hours"), errors="coerce"
                     )
-
                     created_raw = row.get("Created Time")
                     resolved_raw = row.get("Resolved Time")
 
@@ -133,7 +132,6 @@ class LegacyDataStagingGateway:
 
                             c_dt = datetime.strptime(str(created_raw).strip(), fmt)
                             r_dt = datetime.strptime(str(resolved_raw).strip(), fmt)
-
                             res_hours_val = max(
                                 0.0, (r_dt - c_dt).total_seconds() / 3600.0
                             )

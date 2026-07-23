@@ -1,4 +1,4 @@
-import os
+# pyrefly: ignore [missing-import]
 import streamlit as st
 import pandas as pd
 from pathlib import Path
@@ -27,6 +27,30 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+st.markdown(
+    """
+    <style>
+    /* Fix sidebar scrolling */
+    [data-testid="stSidebarUserContent"], [data-testid="stSidebarNav"] {
+        overflow-y: auto !important;
+        max-height: 100vh;
+    }
+    
+    /* Fix dropdown popup menus */
+    div[data-baseweb="popover"] {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    /* Reduce padding between sidebar elements */
+    [data-testid="stSidebarUserContent"] .stSelectbox {
+        margin-bottom: -15px !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 
 def run_system_sync_sequence(csv_path):
     if Path(csv_path).exists():
@@ -37,6 +61,34 @@ def run_system_sync_sequence(csv_path):
 
 # --- SIDEBAR CONTROL FILTERS ---
 st.sidebar.header("🎛️ Operations Control Panel")
+
+# Discover CSV datasets
+data_dir = Path("data")
+csv_files = list(data_dir.glob("*.csv")) if data_dir.exists() else []
+
+# Handle empty or missing data folder
+if not csv_files:
+    csv_paths = [CSV_PATH]
+    csv_names = [Path(CSV_PATH).name]
+else:
+    csv_paths = [str(p) for p in csv_files]
+    csv_names = [p.name for p in csv_files]
+
+# Set default selection to tickets.csv if it exists
+default_idx = 0
+for idx, name in enumerate(csv_names):
+    if name == "tickets.csv":
+        default_idx = idx
+        break
+
+selected_csv_name = st.sidebar.selectbox("Select CSV Dataset:", csv_names, index=default_idx)
+selected_csv_path = csv_paths[csv_names.index(selected_csv_name)]
+st.session_state["selected_csv"] = selected_csv_path
+
+if st.sidebar.button("🔄 Sync Selected Dataset"):
+    with st.spinner(f"Seeding relational database tables from {selected_csv_name}..."):
+        run_system_sync_sequence(st.session_state["selected_csv"])
+        st.sidebar.success("Local database synchronization complete.")
 
 # List all CSV files in the data directory
 csv_files = sorted([f.name for f in DATA_DIR.glob("*.csv")])
@@ -129,10 +181,15 @@ selected_priority = st.sidebar.selectbox(
     "Filter view context by Severity:", priority_options
 )
 
+effort_options = ["1 min", "2 min", "3 min", "4 min", "5 min"]
+selected_effort_exclusion = st.sidebar.multiselect(
+    "Exclude Tickets by Effort (mins):", effort_options, default=[]
+)
+
 # --- EXECUTE MULTI-FILTER ROUTING PARSING ---
 filtered_df = df_filtered_base.copy()
 
-# Apply Date Range filter
+# Apply Date Range filter   
 if isinstance(selected_date_range, tuple) and len(selected_date_range) == 2:
     start_date, end_date = selected_date_range
     filtered_df = filtered_df[
@@ -176,6 +233,16 @@ if selected_agent != "All Agents":
 # Apply Priority Filter
 if selected_priority != "All Priorities":
     filtered_df = filtered_df[filtered_df["priority"] == selected_priority]
+
+# Apply Effort Exclusion Filter
+if selected_effort_exclusion:
+    if "effort_mins" in filtered_df.columns:
+        try:
+            exclude_mins = [int(opt.split()[0]) for opt in selected_effort_exclusion]
+            effort_numeric = pd.to_numeric(filtered_df["effort_mins"], errors="coerce")
+            filtered_df = filtered_df[~effort_numeric.isin(exclude_mins)]
+        except Exception:
+            pass
 
 # Calculate rankings out of the scoped dataset window immediately, passing the context type
 rankings_df = OperationsLeaderboardScorer.compile_weighted_rankings(
@@ -377,10 +444,8 @@ with tab_breached:
 
 # Section 4: Systemic Root Cause & Security Compliance Diagnostics
 st.markdown("---")
-st.subheader("🛡️ Systemic Infrastructure Root Cause & Security Compliance Diagnostics")
-st.caption(
-    "Scans high-volume repeating noise clusters to construct air-gapped security playbooks and engineering efficiency strategies."
-)
+st.subheader("🛡️ Infrastructure Noise Clusters & Top 5 Systemic Alerts")
+st.caption("Scans high-volume repeating noise clusters to construct air-gapped security playbooks and engineering efficiency strategies.")
 
 if st.button("🔮 Analyze Infrastructure Noise Clusters & Security Exposure"):
     with st.spinner(
@@ -388,7 +453,24 @@ if st.button("🔮 Analyze Infrastructure Noise Clusters & Security Exposure"):
     ):
         rc_engine = SystemicRootCauseEngine()
         strategic_review = rc_engine.cluster_and_analyze_patterns(filtered_df)
-        st.info(strategic_review)
+        
+        if isinstance(strategic_review, dict):
+            if "error" in strategic_review:
+                st.warning(strategic_review["error"])
+            else:
+                st.markdown("#### 🚨 Top 5 Noisy Alerts")
+                alerts_df = pd.DataFrame(strategic_review["top_alerts"])
+                alerts_df = alerts_df.rename(columns={
+                    "Target Company Context": "Company Name",
+                    "Total Occurrence Count": "Frequency Count"
+                })
+                st.dataframe(alerts_df, use_container_width=True, hide_index=True)
+                
+                st.markdown("#### 🧠 AI Security & Efficiency Impact Summary")
+                with st.expander("View Strategic Insights", expanded=True):
+                    st.info(strategic_review["insights"])
+        else:
+            st.info(strategic_review)
 
 
 # Section 5: Interactive Plotly Chart Columns Block
