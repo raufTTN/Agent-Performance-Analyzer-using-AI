@@ -27,6 +27,17 @@ class AutomatedReportGenerator:
         avg_resolution = round(agent_df["resolution_hours"].mean(), 2) if "resolution_hours" in agent_df.columns else 0
         total_effort = round(agent_df["effort_mins"].sum(), 0) if "effort_mins" in agent_df.columns else 0
         
+        # Calculate SR vs Incident count
+        is_sr = pd.Series(False, index=agent_df.index)
+        for col in agent_df.columns:
+            if col.lower().strip() in ['category', 'type', 'ticket_type', 'ticket type']:
+                is_sr = is_sr | agent_df[col].astype(str).str.contains(r"(?i)(service request|\bsr\b)", na=False)
+        if "subject" in agent_df.columns:
+            sr_keywords = r"(?i)(service request|\bsr\b|grant is awaiting|approve or deny|grant access|access request)"
+            is_sr = is_sr | agent_df["subject"].astype(str).str.contains(sr_keywords, na=False)
+        total_sr = int(is_sr.sum())
+        total_incidents = total_tickets - total_sr
+
         # 2. Categorical & Company Distribution
         def get_dist(col_name):
             if col_name in agent_df.columns:
@@ -70,7 +81,7 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                 
         # 5. Build HTML Report (CSS Grid & Print Styles)
         html_content = AutomatedReportGenerator._build_html(
-            total_tickets, compliance, total_breaches, avg_resolution, total_effort,
+            total_tickets, compliance, total_breaches, avg_resolution, total_effort, total_sr, total_incidents,
             agent_rankings, ai_remarks, company_dist, priority_dist, type_dist, selected_agent
         )
         
@@ -94,20 +105,22 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
         }
 
     @staticmethod
-    def _build_html(total, compliance, breaches, avg_res, total_effort, agent_rankings, remarks, c_dist, p_dist, t_dist, scope):
+    def _build_html(total, compliance, breaches, avg_res, total_effort, total_sr, total_incidents, agent_rankings, remarks, c_dist, p_dist, t_dist, scope):
         now_str = datetime.now().strftime('%d %b %Y, %H:%M')
         
         # Generate rows for agent table
         agent_rows = ""
-        for _, row in agent_rankings.iterrows():
+        for i, row in agent_rankings.iterrows():
             agent_name = row['agent']
             score = row.get('Performance_Score', 'N/A')
             vol = row.get('Tickets_Handled', 0)
             res_hr = row.get('Avg_Resolution_Hours', 0)
             remark = remarks.get(agent_name, "Solid operational performance.")
             
+            row_class = "row-alt" if i % 2 != 0 else ""
+            
             agent_rows += f"""
-            <tr>
+            <tr class="{row_class}">
                 <td><strong>{agent_name}</strong></td>
                 <td>{score}</td>
                 <td>{vol}</td>
@@ -125,138 +138,167 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
         <html>
         <head>
             <meta charset="utf-8">
-            <title>Executive Operations Review</title>
+            <title>Enterprise SRE & IT Operations Intelligence Report</title>
             <style>
                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
                 
+                @page {{
+                    size: A4;
+                    margin: 1cm;
+                }}
+
                 body {{
-                    font-family: 'Inter', sans-serif;
-                    background-color: #f8fafc;
+                    font-family: 'Inter', Helvetica, sans-serif;
+                    background-color: #ffffff;
                     color: #0f172a;
                     margin: 0;
-                    padding: 40px;
+                    padding: 20px;
                 }}
                 
                 .header {{
-                    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-                    color: white;
-                    padding: 30px;
-                    border-radius: 12px;
-                    margin-bottom: 30px;
-                    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                    background: #0f172a;
+                    color: #ffffff;
+                    padding: 25px;
+                    border-radius: 8px;
+                    margin-bottom: 25px;
                 }}
                 
-                .header h1 {{ margin: 0 0 10px 0; font-size: 28px; }}
-                .header p {{ margin: 0; color: #94a3b8; font-size: 14px; }}
+                .header h1 {{ margin: 0 0 8px 0; font-size: 24px; font-weight: 700; }}
+                .header p {{ margin: 0; color: #cbd5e1; font-size: 13px; }}
                 
                 .grid-kpi {{
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    gap: 20px;
-                    margin-bottom: 30px;
+                    width: 100%;
+                    margin-bottom: 25px;
+                    border-collapse: separate;
+                    border-spacing: 15px;
                 }}
-                
+
                 .card {{
-                    background: white;
-                    padding: 24px;
-                    border-radius: 12px;
-                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+                    background: #f8fafc;
+                    padding: 20px;
+                    border-radius: 8px;
                     border: 1px solid #e2e8f0;
+                    margin-bottom: 20px;
                 }}
                 
                 .card-title {{
-                    font-size: 13px;
+                    font-size: 12px;
                     text-transform: uppercase;
                     font-weight: 600;
                     color: #64748b;
-                    margin-bottom: 10px;
+                    margin-bottom: 8px;
                 }}
                 
                 .card-value {{
-                    font-size: 28px;
+                    font-size: 24px;
                     font-weight: 700;
                     color: #0f172a;
                 }}
                 
                 .badge {{
                     display: inline-block;
-                    padding: 4px 10px;
-                    border-radius: 999px;
-                    font-size: 12px;
+                    padding: 3px 8px;
+                    border-radius: 12px;
+                    font-size: 11px;
                     font-weight: 600;
                 }}
                 .badge-success {{ background: #dcfce7; color: #166534; }}
                 .badge-danger {{ background: #fee2e2; color: #991b1b; }}
                 
-                table {{
+                table.data-table {{
                     width: 100%;
                     border-collapse: collapse;
                     margin-top: 10px;
+                    border: 1px solid #e2e8f0;
                 }}
                 
-                th, td {{
-                    padding: 12px 16px;
+                table.data-table th, table.data-table td {{
+                    padding: 12px;
                     text-align: left;
                     border-bottom: 1px solid #e2e8f0;
+                    font-size: 13px;
                 }}
                 
-                th {{
+                table.data-table th {{
                     background-color: #f1f5f9;
-                    font-size: 13px;
+                    font-weight: 600;
                     text-transform: uppercase;
                     color: #475569;
                 }}
                 
-                .grid-dist {{
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 20px;
-                    margin-top: 30px;
+                tr.row-alt {{ background-color: #f8fafc; }}
+                
+                .section-title {{
+                    font-size: 16px;
+                    font-weight: 700;
+                    margin-top: 0;
+                    margin-bottom: 15px;
+                    color: #0f172a;
+                    border-bottom: 2px solid #e2e8f0;
+                    padding-bottom: 8px;
                 }}
                 
-                ul {{ margin: 0; padding-left: 20px; color: #475569; }}
-                li {{ margin-bottom: 8px; }}
-                
-                @media print {{
-                    body {{ background: white; padding: 0; }}
-                    .card {{ box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }}
-                    .header {{ background: #0f172a; color: white; print-color-adjust: exact; -webkit-print-color-adjust: exact; }}
-                }}
+                ul {{ margin: 0; padding-left: 20px; color: #475569; font-size: 13px; }}
+                li {{ margin-bottom: 6px; }}
             </style>
         </head>
         <body>
             <div class="header">
-                <h1>Executive Operations Analytics Review</h1>
+                <h1>Enterprise SRE & IT Operations Intelligence Report</h1>
                 <p>Scope: {scope} | Generated: {now_str}</p>
             </div>
             
-            <div class="grid-kpi">
-                <div class="card">
-                    <div class="card-title">Total Handled</div>
-                    <div class="card-value">{total}</div>
-                </div>
-                <div class="card">
-                    <div class="card-title">SLA Compliance</div>
-                    <div class="card-value">
-                        {compliance}% 
-                        <span class="badge {'badge-success' if compliance >= 90 else 'badge-danger'}">
-                            {breaches} Breaches
-                        </span>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">Avg Resolution Time</div>
-                    <div class="card-value">{avg_res} <span style="font-size:16px; color:#64748b;">Hrs</span></div>
-                </div>
-                <div class="card">
-                    <div class="card-title">Total Effort Spent</div>
-                    <div class="card-value">{total_effort} <span style="font-size:16px; color:#64748b;">Mins</span></div>
-                </div>
-            </div>
+            <table class="grid-kpi">
+                <tr>
+                    <td>
+                        <div class="card">
+                            <div class="card-title">Total Handled</div>
+                            <div class="card-value">{total}</div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="card">
+                            <div class="card-title">SLA Compliance</div>
+                            <div class="card-value">
+                                {compliance}% 
+                                <span class="badge {'badge-success' if compliance >= 90 else 'badge-danger'}">
+                                    {breaches} Breaches
+                                </span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="card">
+                            <div class="card-title">Avg Resolution</div>
+                            <div class="card-value">{avg_res} <span style="font-size:14px; color:#64748b;">Hrs</span></div>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <div class="card">
+                            <div class="card-title">Total Effort Spent</div>
+                            <div class="card-value">{total_effort} <span style="font-size:14px; color:#64748b;">Mins</span></div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="card">
+                            <div class="card-title">Service Requests Resolved</div>
+                            <div class="card-value">{total_sr}</div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="card">
+                            <div class="card-title">Incidents Resolved</div>
+                            <div class="card-value">{total_incidents}</div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
             
             <div class="card">
-                <h3 style="margin-top: 0; color: #0f172a;">Engineering Scorecard & AI Remarks</h3>
-                <table>
+                <div class="section-title">Engineering Scorecard & AI Remarks</div>
+                <table class="data-table">
                     <thead>
                         <tr>
                             <th>Agent</th>
@@ -272,21 +314,27 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                 </table>
             </div>
             
-            <div class="grid-dist">
-                <div class="card">
-                    <h3 style="margin-top: 0; color: #0f172a;">Top Associated Companies</h3>
-                    <ul>{dict_to_html_list(c_dist)}</ul>
-                </div>
-                <div class="card">
-                    <h3 style="margin-top: 0; color: #0f172a;">Workload Distribution</h3>
-                    <ul>
-                        <li><strong>By Priority:</strong></li>
-                        <ul>{dict_to_html_list(p_dist)}</ul>
-                        <li style="margin-top: 10px;"><strong>By Type:</strong></li>
-                        <ul>{dict_to_html_list(t_dist)}</ul>
-                    </ul>
-                </div>
-            </div>
+            <table width="100%" style="margin-top: 20px;">
+                <tr>
+                    <td width="50%" valign="top" style="padding-right: 10px;">
+                        <div class="card">
+                            <div class="section-title">Top Associated Companies</div>
+                            <ul>{dict_to_html_list(c_dist)}</ul>
+                        </div>
+                    </td>
+                    <td width="50%" valign="top" style="padding-left: 10px;">
+                        <div class="card">
+                            <div class="section-title">Workload Distribution</div>
+                            <ul>
+                                <li><strong>By Priority:</strong></li>
+                                <ul>{dict_to_html_list(p_dist)}</ul>
+                                <li style="margin-top: 10px;"><strong>By Type:</strong></li>
+                                <ul>{dict_to_html_list(t_dist)}</ul>
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+            </table>
         </body>
         </html>
         """
