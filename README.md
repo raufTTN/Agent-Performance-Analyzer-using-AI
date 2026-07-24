@@ -1,217 +1,116 @@
-# 🛡️ Enterprise SRE & IT Operations Intelligence Platform
+<div align="center">
+  <h1>🛡️ Enterprise SRE & IT Operations Intelligence Platform</h1>
+  <p><strong>Offline-First, AI-Powered SRE Dashboard for High-Security Environments</strong></p>
+  
+  ![Python Version](https://img.shields.io/badge/Python-3.9%2B-blue?style=for-the-badge&logo=python)
+  ![Streamlit](https://img.shields.io/badge/Streamlit-1.30%2B-FF4B4B?style=for-the-badge&logo=streamlit)
+  ![SQLite](https://img.shields.io/badge/SQLite-Local-003B57?style=for-the-badge&logo=sqlite)
+  ![Ollama](https://img.shields.io/badge/AI-Ollama_Local-white?style=for-the-badge&logo=ollama)
+  ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+</div>
 
-> **Air-Gapped, Local AI-Powered Agent Performance Analyzer & IT Operations Diagnostics Suite**
+<br>
 
-![Python](https://img.shields.io/badge/Python-3.9%2B-blue?logo=python&logoColor=white)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.28%2B-FF4B4B?logo=streamlit&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)
-![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-000000?logo=ollama&logoColor=white)
-![Plotly](https://img.shields.io/badge/Plotly-Charts-3F4F75?logo=plotly&logoColor=white)
-![Privacy](https://img.shields.io/badge/Privacy-100%25_Air--Gapped-green)
+## 📖 Executive Summary
 
-The **Enterprise SRE & IT Operations Intelligence Platform** is an end-to-end operational analytics engine designed for SRE, IT Service Management (ITSM), and Operations leadership. It ingests ticket datasets, audits SLA compliance, calculates multi-factor agent leaderboard rankings, clusters infrastructure noise, surfaces historical resolutions via an in-memory vector RAG engine, and performs deep LLM ticket forensics—all completely local and air-gapped without relying on external cloud APIs.
+The **Enterprise SRE & IT Operations Intelligence Platform** is a secure, monolithic data analytics dashboard built to ingest raw IT support workflows, rigorously calculate compliance metrics, and automatically uncover root-cause insights. 
 
----
-
-## 🌟 Key Features
-
-### 1. 🎛️ Operations Control Panel & Dynamic Filtering
-- **Multi-Dataset Ingestion**: Select and sync dynamically from any `.csv` file in the `data/` folder directly into SQLite storage.
-- **Context-Aware Filtering**: Filter metrics by Date Range, Target Company, Ticket Classification (Service Requests vs Incidents), SRE Agent, and Severity.
-- **⏱️ Minute-Wise Resolution Duration Filter**: Exclude tickets resolved below a configurable minute-wise threshold (default: 5 minutes) to strip out instant automated closes for accurate agent performance evaluation.
-- **🔀 Merged Ticket Scope Controls**: Choose to **Exclude Merged Tickets** (default), view **All Tickets (Merged & Unmerged)**, or isolate **Only Merged Tickets** for audit.
-- **Automated Bot Exclusion**: Automatically filters out system closures (`Auto-Resolve`, `System Agent`, `bot`) to prevent metric skew.
-
-### 2. 📊 Executive Operations KPIs & Diagnostics
-- **Real-Time KPI Dashboard**: Live tracking of Total Scope Volume, Global SLA Compliance %, Resolution Breach Counts, and Average Resolution Time.
-- **Workflow & Workload Visualizations**: Interactive Plotly visualizations for Severity Priority Distributions and SRE Agent Workload Allocations.
-- **Chronological Leadership Tracker**: Month-over-month operational performance tracker isolating top SRE performers and fastest resolvers.
-
-### 3. 🏆 Context-Aware Performance Leaderboard
-- Dynamic weighted scoring algorithm that adapts based on work type:
-  - **Incidents**: Prioritizes SLA Compliance (50%) and Resolution Speed (35%).
-  - **Service Requests**: Prioritizes Volume Handled (40%) and Effort Efficiency (20%).
-  - **Balanced/All**: Balanced evaluation across SLA, Speed, Volume, and Effort.
-
-### 4. 🧠 Local AI & RAG Engineering Engine (Ollama Air-Gapped)
-- **Zero-Dependency Vector Store RAG (`ai/rag_engine.py`)**: Lightweight 384-dimensional native frequency hashing vector store to surface similar past resolved tickets via Cosine Similarity.
-- **LLM Forensic Ticket Investigator (`analytics/ticket_ai.py`)**: Uses local `qwen2.5:3b` LLM inference via Ollama to identify handoff process errors, technical root causes, and workflow optimization plans.
-- **Systemic Root Cause Engine (`analytics/root_cause.py`)**: Clusters operational noise and high-volume ticket patterns to generate infrastructure security playbooks.
-- **Agent Coaching Workshop (`analytics/insights.py`)**: Generates personalized AI coaching profile assessments for individual engineers based on historical ticket logs.
-
-### 5. 📋 Automated Executive Report Generator
-- One-click compilation of standalone executive HTML operations summary reports saved directly to `reports/`.
+Designed for strict, air-gapped enterprise environments, this platform operates **100% offline**. By leveraging a localized SQLite staging gateway and an embedded LLM (Ollama), it guarantees that highly sensitive infrastructure logs, security incidents, and user data never leave your internal network.
 
 ---
 
-## 🏗️ System Architecture
+## 🌟 Core Features
 
-```mermaid
-graph TD
-    A[CSV Data Sources / data/*.csv] -->|LegacyDataStagingGateway| B[(SQLite Database / data/analyzer.db)]
-    B -->|CoreSLADiagnosticEngine| C[SLA Breach Audit & Indexing]
-    
-    subgraph UI & Analytics Layer
-        C --> D[Streamlit Dashboard / app.py]
-        D --> E[OperationsLeaderboardScorer]
-        D --> F[Plotly Analytics Charts]
-        D --> G[AutomatedReportGenerator / reports/*.html]
-    end
-    
-    subgraph Air-Gapped Local AI Layer
-        D --> H[LocalTicketVectorStore / RAG Engine]
-        D --> I[LocalTicketAnalyzer / Forensics]
-        D --> J[SystemicRootCauseEngine]
-        D --> K[LocalAgentCoachingEngine]
-        H & I & J & K <-->|Local HTTP API| L[Ollama Daemon / qwen2.5:3b]
-    end
-```
+- **🧠 AI Forensic Auditor (`analytics/ticket_explorer.py`)**
+  Instantly surface historically similar solved tickets using semantic proximity, and generate LLM-powered root-cause summaries natively. Stop reinventing the wheel on recurring issues.
+
+- **🛡️ Infrastructure Noise Clustering (`analytics/noise_cluster.py`)**
+  Intelligently groups repetitive ticket subjects against associated companies and contexts, surfacing the top 5 highest-frequency noise alerts to help build security playbooks.
+
+- **⏱️ SLA Compliance Engine (`analytics/scoring.py`)**
+  Deep calculation of resolution limits, automatically tracking breached cases vs. SLA successes. Weights agent performance dynamically based on the work type (Volume/SRs vs. Speed/Incidents).
+
+- **📊 Executive Review Compiler (`utils/insights.py`)**
+  Generates robust, paginated reports complete with CSS grid styling, global KPIs, and LLM-powered strategic batch remarks for every agent. Exportable seamlessly into premium **HTML** and **PDF** formats.
+
+- **⚡ Multi-Value Effort Filtering & Fast Staging**
+  Clean dashboard scope instantly by filtering multiple effort values. Backed by `LegacyDataStagingGateway`, which safely handles dataset ingestion, formatting, and high-speed SQLite seeding.
 
 ---
 
-## 📁 Repository Directory Structure
+## ⚙️ Tech Stack Overview
 
-```
+| Category | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Frontend/UI Engine** | `Streamlit` | Reactive, stateless UI rendering with Dual-Theme Glassmorphism. |
+| **Data Engineering** | `Pandas`, `SQLite3` | ETL pipelines, sanitization, and localized fast-read database storage. |
+| **Visualization** | `Plotly` | Interactive KPI grids and charting. |
+| **Local AI Inference** | `Ollama` | Self-hosted LLM API endpoint for air-gapped forensic diagnostics. |
+| **Document Export** | `xhtml2pdf`, HTML5/CSS3 | Enterprise SLA reporting engine. |
+
+---
+
+## 📂 Directory Structure
+
+```text
 .
-├── ai/
-│   └── rag_engine.py         # Lightweight 384-dim native vector store & cosine similarity search
-├── analytics/
-│   ├── charts.py             # Plotly charts for priority and workload distributions
-│   ├── insights.py           # Local AI Agent Career Coaching Workshop engine
-│   ├── root_cause.py         # Infrastructure noise clustering & security diagnostics engine
-│   ├── scoring.py            # Multi-factor context-aware agent leaderboard scorer
-│   ├── sla.py                # Core SLA audit and breach calculation engine
-│   ├── ticket_ai.py          # Local LLM ticket forensic investigator (Ollama wrapper)
-│   └── ticket_explorer.py    # Streamlit forensic investigator component with RAG search
-├── utils/
-│   ├── db_manager.py         # SQLite connection context manager & table initializations
-│   ├── insights.py           # Standalone executive HTML report compiler
-│   └── loader.py             # CSV data staging gateway, timestamp normalization & seeder
-├── data/
-│   ├── analyzer.db           # SQLite database storage (generated on launch)
-│   └── *.csv                 # Raw operations ticket datasets
-├── reports/                  # Generated HTML executive summary reports
-├── docs/                     # Detailed architectural and user guide documentation
-│   ├── ARCHITECTURE.md
-│   └── USER_GUIDE.md
-├── app.py                    # Main Streamlit web app interface controller
-├── config.py                 # Centralized configuration, SLA thresholds & scoring weights
-├── setup_master.sh           # Automated deployment and setup bash pipeline
-├── .gitignore                # Git ignore rules for venv, DB, caches, and reports
-└── README.md                 # Project README documentation
+├── analytics/             # Core AI, SLAs, Forensics, Root-Cause & Scoring logic
+│   ├── noise_cluster.py
+│   ├── scoring.py
+│   └── ticket_explorer.py
+├── utils/                 # ETL loaders, database managers, and HTML compilers
+│   ├── db_manager.py
+│   ├── insights.py
+│   └── loader.py
+├── data/                  # Drop zone for target .csv dataset ingestion
+├── reports/               # Output destination for generated HTML/PDF Executive Reviews
+├── app.py                 # Main Streamlit dashboard application UI
+├── config.py              # Centralized environment constants & model weights configuration
+├── newsetup_master.sh     # One-click deployment environment bootstrapping script
+├── IMPLEMENTATION.md      # Detailed Architecture and Engineering documentation
+└── README.md              # Project documentation
 ```
 
 ---
 
-## ⚙️ Tech Stack & Prerequisites
+## 🚀 Getting Started (Installation Guide)
 
-- **Language**: Python 3.9+
-- **Frontend / Dashboard Framework**: Streamlit
-- **Data & Visualizations**: Pandas, Plotly, NumPy
-- **Database**: SQLite3 (Embedded, file-based at `data/analyzer.db`)
-- **Local AI Daemon**: [Ollama](https://ollama.ai/) running model `qwen2.5:3b` (Listening on `http://localhost:11434`)
+We have packaged a master bootstrapping script that will automatically detect Python, build an isolated virtual environment, fetch all necessary dependencies, construct missing directories, and boot the frontend engine!
 
----
-
-## 🚀 Quick Start Guide
-
-### Option 1: Automated One-Command Setup (Recommended)
-
-Run the included deployment script:
-
+### 1. Execute the Bootstrapper
+Ensure you are in the project root directory, then run:
 ```bash
-chmod +x setup_master.sh
-./setup_master.sh
+chmod +x newsetup_master.sh
+./newsetup_master.sh
 ```
 
-This master script automatically:
-1. Verifies Python 3 installation.
-2. Creates and activates a Python virtual environment (`venv`).
-3. Installs required Python dependencies (`streamlit`, `pandas`, `plotly`, `requests`).
-4. Verifies/creates necessary directories (`data/`, `reports/`, `analytics/`, `utils/`, `ai/`).
-5. Checks for local Ollama installation and pulls `qwen2.5:3b` model weights.
-6. Launches the Streamlit dashboard on port `8501`.
-
----
-
-### Option 2: Manual Setup
-
-1. **Clone the Repository & Navigate to Folder**:
-   ```bash
-   cd agent-performance-analyzer
-   ```
-
-2. **Set Up Python Virtual Environment**:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. **Install Dependencies**:
-   ```bash
-   pip install --upgrade pip
-   pip install streamlit pandas plotly requests numpy
-   ```
-
-4. **Initialize Local AI Model (Ollama)**:
-   Ensure [Ollama](https://ollama.ai/) is installed and running, then pull the model:
-   ```bash
-   ollama pull qwen2.5:3b
-   ```
-
-5. **Run the Dashboard**:
-   ```bash
-   streamlit run app.py
-   ```
-   Open your browser at `http://localhost:8501`.
-
----
-
-## 🛠️ Configuration (`config.py`)
-
-All global parameters can be customized in [`config.py`](file:///home/rauf/agent-performance-analyzer/config.py):
-
-```python
-# Ollama Local AI Settings
-OLLAMA_API_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "qwen2.5:3b"
-
-# Service Level Agreement (SLA) Resolution Targets (Hours)
-SLA_TARGETS = {
-    "urgent": 4.0,   # P0
-    "high": 8.0,     # P1
-    "medium": 16.0,  # P2
-    "low": 24.0      # P3
-}
-
-# Standard Leaderboard Scoring Matrix Weights
-SCORING_WEIGHTS = {
-    "sla_compliance": 0.40,
-    "resolution_speed": 0.30,
-    "volume_impact": 0.20,
-    "effort_efficiency": 0.10
-}
+### 2. Manual Virtual Environment Setup (Optional)
+If you prefer to set up the environment manually:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt   # (Install pandas, streamlit, plotly, requests, xhtml2pdf)
 ```
 
----
-
-## 📖 Comprehensive Documentation
-
-For deep technical details and operational guides, check out:
-- 🏗️ **[System Architecture Guide](file:///home/rauf/agent-performance-analyzer/docs/ARCHITECTURE.md)**: Deep dive into RAG vector search design, LLM integration, database schema, and SLA engine calculations.
-- 📘 **[User & Dashboard Guide](file:///home/rauf/agent-performance-analyzer/docs/USER_GUIDE.md)**: Step-by-step walkthrough of dashboard features, filters, forensic tools, AI coaching, and report exports.
-
----
-
-## 🛡️ Privacy & Air-Gapped Security
-
-This platform is specifically built for enterprise SRE and security-sensitive IT environments:
-- **No external API calls** to third-party AI services.
-- **Zero data telemetry**.
-- All ticket summaries, agent names, and worklogs remain strictly inside local memory and your local SQLite database (`data/analyzer.db`).
+### 3. Launch the Application
+Start the Streamlit monolithic app:
+```bash
+streamlit run app.py
+```
+The dashboard will automatically launch in your default web browser at `http://localhost:8501`.
 
 ---
 
-## 📄 License
+## 💡 Usage Guide
 
-This repository is distributed under the MIT License.
+1. **Ingest CSV Data:** 
+   Place your raw ticket export (e.g., `tickets.csv`) inside the `data/` folder. The application's `LegacyDataStagingGateway` will automatically parse it, fix missing timestamps, and securely load it into the local `analyzer.db` SQLite database when you click "Ingest Data".
+2. **Apply Global Filters:**
+   Use the sidebar to isolate specific companies, timeframes, or ticket types.
+3. **Analyze Effort:**
+   Use the "Effort" multi-select filter to exclude specific minute ranges to remove noise or anomalous ticket data from your analytics.
+4. **Generate SLA Reports:**
+   Scroll to the "Automated Operations Executive Review Compiler" section, click to generate, and download the resulting enterprise PDF for stakeholder distribution.
+
+---
+*Maintained by the Enterprise SRE Engineering Team.*

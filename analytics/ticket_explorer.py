@@ -51,65 +51,6 @@ def show_ai_investigator_ui(df: pd.DataFrame):
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # --- AGENT NOTES & PRIVATE WORKLOG INPUT ---
-            st.markdown("##### 📝 Private Notes & Operational Worklogs")
-            default_note = ticket.get("notes") or ticket.get("resolution_note") or "This ticket was resolved in morning shift but still it was given in afternoon shift"
-            user_notes = st.text_area(
-                "Modify or paste agent notes / private worklogs here to audit for handoff or operational mistakes:",
-                value=default_note,
-                height=100
-            )
-            # Update ticket dict dynamically for prompt context injection
-            ticket["notes"] = user_notes
-            
-            col_actions1, col_actions2 = st.columns(2)
-            
-            with col_actions1:
-                if st.button("🚀 Execute Forensic Ingestion Audit", width="stretch"):
-                    with st.spinner("Invoking local LLM model weights..."):
-                        analyzer = LocalTicketAnalyzer()
-                        findings = analyzer.run_ticket_forensics(ticket)
-                        
-                        if "error" in findings:
-                            st.error(findings["error"])
-                        else:
-                            st.success("Operational & Technical Audit Complete.")
-                            
-                            # RENDER PROCESS AUDIT (Highlights handoff mistakes cleanly via warning banner)
-                            st.markdown("### ⚠️ Process Gaps & Handoff Audit")
-                            handoff_slip = findings.get("Handoff_Process_Mistakes") or "No obvious handoff mistakes detected in notes."
-                            st.warning(handoff_slip)
-                            
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                st.markdown("### 📋 Incident Diagnostics")
-                                st.markdown(f"**Technical Root Cause:**\n{findings.get('Technical_Root_Cause')}")
-                            with c2:
-                                st.markdown("### 🛠️ Process Improvement")
-                                st.markdown(f"**Workflow Optimization Plan:**\n{findings.get('Workflow_Optimization_Plan')}")
-                                
-                            with st.expander("View Raw LLM Unparsed Generative Output"):
-                                st.code(findings.get("Raw"))
-                                
-            with col_actions2:
-                if st.button("🧠 Surface Similar Historical Solved Tickets", width="stretch"):
-                    with st.spinner("Calculating vector similarity distances natively..."):
-                        v_store = LocalTicketVectorStore()
-                        similar_cases = v_store.surface_similar_resolutions(
-                            ticket.get("subject", ""), 
-                            ticket.get("description", "")
-                        )
-                        
-                        if not similar_cases:
-                            st.warning("No semantically overlapping historical cases found inside local database.")
-                        else:
-                            st.success(f"Discovered {len(similar_cases)} relevant matching incident profiles:")
-                            for idx, case in enumerate(similar_cases):
-                                with st.container():
-                                    st.markdown(f"##### {idx+1}. Ticket #{case['ticket_id']} (Match Confidence: {case['confidence']}% )")
-                                    st.markdown(f"**Subject Alignment:** {case['subject']}")
-                                    st.markdown(f"**Verified Fix Applied by {case['agent']}:**")
-                                    st.info(case['resolution_note'])
-                                    st.markdown("---")
+
         else:
             st.error("Ticket ID not discovered inside the current operational scope.")
