@@ -1,26 +1,21 @@
-import pandas as pd
 from datetime import datetime
-import json
-import requests
-from config import REPORTS_DIR, OLLAMA_API_URL, OLLAMA_MODEL, LLM_TIMEOUT
-from analytics.scoring import OperationsLeaderboardScorer
+import pandas as pd
+from config import REPORTS_DIR
+
 
 class AutomatedReportGenerator:
-    @staticmethod
-    def generate_rich_executive_report(df: pd.DataFrame, selected_agent: str = "All Agents") -> dict:
-        if df.empty:
-            return {"error": "Execution skipped: Database scope currently empty."}
 
-        # Handle agent filtering
+    @staticmethod
+    def compile_executive_html(df: pd.DataFrame, selected_agent: str = "All Agents") -> str:
+        if df.empty:
+            return "Execution skipped: Database scope currently empty."
+
+        # Ensure df is filtered for the specific agent if it hasn't been already
         if selected_agent != "All Agents" and "agent" in df.columns:
             agent_df = df[df["agent"] == selected_agent].copy()
         else:
             agent_df = df.copy()
-            
-        if agent_df.empty:
-            return {"error": f"No data found for agent: {selected_agent}"}
 
-        # 1. Compute Global KPIs
         total_tickets = len(agent_df)
         total_breaches = int(agent_df["sla_breached"].sum()) if "sla_breached" in agent_df.columns else 0
         compliance = round(((total_tickets - total_breaches) / total_tickets) * 100, 1) if total_tickets > 0 else 100.0
@@ -84,25 +79,6 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
             total_tickets, compliance, total_breaches, avg_resolution, total_effort, total_sr, total_incidents,
             agent_rankings, ai_remarks, company_dist, priority_dist, type_dist, selected_agent
         )
-        
-        # 6. PDF Generation Fallback
-        pdf_bytes = None
-        try:
-            # pyrefly: ignore [missing-import]
-            from xhtml2pdf import pisa
-            import io
-            result = io.BytesIO()
-            # xhtml2pdf requires string or file-like object
-            pdf = pisa.pisaDocument(io.StringIO(html_content), result)
-            if not pdf.err:
-                pdf_bytes = result.getvalue()
-        except ImportError:
-            pass
-
-        return {
-            "html": html_content,
-            "pdf": pdf_bytes
-        }
 
     @staticmethod
     def _build_html(total, compliance, breaches, avg_res, total_effort, total_sr, total_incidents, agent_rankings, remarks, c_dist, p_dist, t_dist, scope):

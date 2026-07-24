@@ -5,7 +5,7 @@ from analytics.ticket_ai import LocalTicketAnalyzer
 from ai.rag_engine import LocalTicketVectorStore
 
 def show_ai_investigator_ui(df: pd.DataFrame):
-    """Renders the internal ticket audit panel augmented with detailed metric previews and RAG vector matching."""
+    """Renders the forensic analysis panel with operational handoff and mistake audit logic."""
     st.markdown("---")
     st.subheader("🔍 Deep Ticket Forensics Explorer & AI Auditor")
     st.caption("Secured local LLM processing layer + native vector lookup. Zero network dependencies.")
@@ -17,7 +17,7 @@ def show_ai_investigator_ui(df: pd.DataFrame):
         if not match.empty:
             ticket = match.iloc[0].to_dict()
             
-            # --- EXTRACT METRIC PARTICULARS ---
+            # --- EXTRACT METRICS ---
             priority = str(ticket.get('priority', 'N/A')).upper()
             status = str(ticket.get('status', 'N/A'))
             
@@ -32,12 +32,9 @@ def show_ai_investigator_ui(df: pd.DataFrame):
                     closure_time_str = "N/A"
                     
             effort_mins = ticket.get('effort_mins', 0.0)
-            
-            # Determine dynamic badge formatting for the SLA target status
             sla_breached = ticket.get('sla_breached', 0)
             sla_status_text = "🚨 BREACHED" if sla_breached == 1 else "✅ WITHIN SLA"
             
-            # --- RENDER ENHANCED METRIC HUD BLOCK ---
             st.info(f"**Loaded Case:** {ticket.get('subject')} | **Engineer Assigned:** {ticket.get('agent')}")
             
             # Use columns to present the structural metadata cleanly
