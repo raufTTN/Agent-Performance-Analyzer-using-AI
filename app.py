@@ -5,7 +5,6 @@ from pathlib import Path
 from datetime import datetime
 
 # Absolute backend orchestration system hooks import
-# from config import DB_PATH, CSV_PATH, OLLAMA_MODEL, DATA_DIR
 from config import DB_PATH, OLLAMA_MODEL, DATA_DIR
 from utils.db_manager import initialize_database, get_db_connection
 from utils.loader import LegacyDataStagingGateway
@@ -62,59 +61,38 @@ def run_system_sync_sequence(csv_path):
 # --- SIDEBAR CONTROL FILTERS ---
 st.sidebar.header("🎛️ Operations Control Panel")
 
-# Discover CSV datasets
-data_dir = Path("data")
-csv_files = list(data_dir.glob("*.csv")) if data_dir.exists() else []
-
-# Handle empty or missing data folder
-if not csv_files:
-    csv_paths = [CSV_PATH]
-    csv_names = [Path(CSV_PATH).name]
-else:
-    csv_paths = [str(p) for p in csv_files]
-    csv_names = [p.name for p in csv_files]
-
-# Set default selection to tickets.csv if it exists
-default_idx = 0
-for idx, name in enumerate(csv_names):
-    if name == "tickets.csv":
-        default_idx = idx
-        break
-
-selected_csv_name = st.sidebar.selectbox("Select CSV Dataset:", csv_names, index=default_idx)
-selected_csv_path = csv_paths[csv_names.index(selected_csv_name)]
-st.session_state["selected_csv"] = selected_csv_path
-
-if st.sidebar.button("🔄 Sync Selected Dataset"):
-    with st.spinner(f"Seeding relational database tables from {selected_csv_name}..."):
-        run_system_sync_sequence(st.session_state["selected_csv"])
-        st.sidebar.success("Local database synchronization complete.")
-
-# List all CSV files in the data directory
-csv_files = sorted([f.name for f in DATA_DIR.glob("*.csv")])
+# Discover CSV datasets dynamically from DATA_DIR
+csv_files = sorted([f.name for f in DATA_DIR.glob("*.csv")]) if DATA_DIR.exists() else []
 
 if not csv_files:
     st.sidebar.warning("No CSV files found in the data directory.")
+    selected_csv_path = None
 else:
-    selected_csv = st.sidebar.selectbox("📂 Select CSV Dataset", csv_files)
+    # Set default selection index to 'tickets.csv' if present
+    default_idx = 0
+    if "tickets.csv" in csv_files:
+        default_idx = csv_files.index("tickets.csv")
 
+    selected_csv = st.sidebar.selectbox("📂 Select CSV Dataset", csv_files, index=default_idx)
     selected_csv_path = DATA_DIR / selected_csv
+    st.session_state["selected_csv"] = str(selected_csv_path)
 
     st.sidebar.caption(f"Selected Dataset: **{selected_csv}**")
 
-    if st.sidebar.button("🔄 Sync Selected Dataset"):
+    if st.sidebar.button("🔄 Sync Selected Dataset", key="sync_selected_dataset_btn"):
         with st.spinner(f"Syncing {selected_csv}..."):
             run_system_sync_sequence(str(selected_csv_path))
 
         st.sidebar.success("✅ Local database synchronized successfully.")
         st.rerun()
+
 # Read staging frame out of relational database storage
 with get_db_connection() as conn:
     df_master = pd.read_sql_query("SELECT * FROM tickets", conn)
 
 if df_master.empty:
     st.info(
-        "💡 Storage engines empty. Click 'Sync Local Data Layer Pipeline' in the sidebar panel to ingest your records out of data/tickets.csv."
+        "💡 Storage engines empty. Click 'Sync Selected Dataset' in the sidebar panel to ingest your records."
     )
     st.stop()
 
@@ -137,7 +115,7 @@ df_filtered_base = df_master[
     .str.contains("auto-resolve|auto_resolved", na=False)
 ].copy()
 
-# --- 2. NEW DROPDOWNS: DYNAMIC DATE, COMPANY & TICKET TYPE SELECTORS ---
+# --- 2. DROPDOWNS: DYNAMIC DATE, COMPANY & TICKET TYPE SELECTORS ---
 min_date = (
     df_filtered_base["created_dt"].min().date()
     if not df_filtered_base["created_dt"].dropna().empty
@@ -201,11 +179,11 @@ if isinstance(selected_date_range, tuple) and len(selected_date_range) == 2:
 if selected_company != "All Companies":
     filtered_df = filtered_df[filtered_df[company_column] == selected_company]
 
-# --- 🚀 DYNAMIC, FAIL-PROOF SR vs INCIDENT ROUTING ---
+# --- 🚀 DYNAMIC SR vs INCIDENT ROUTING ---
 if selected_type != "All Types (SR & Incident)":
     is_sr = pd.Series(False, index=filtered_df.index)
 
-    # 1. Dynamically search ANY column that might hold Type/Category data (ignores case/spelling mismatch)
+    # 1. Dynamically search ANY column that might hold Type/Category data
     for col in filtered_df.columns:
         if col.lower().strip() in ["category", "type", "ticket_type", "ticket type"]:
             is_sr = is_sr | filtered_df[col].astype(str).str.contains(
@@ -214,7 +192,6 @@ if selected_type != "All Types (SR & Incident)":
 
     # 2. Force-check the Subject line to catch automated access requests that lack a Category tag
     if "subject" in filtered_df.columns:
-        # Matches typical SR subjects like the ones in your screenshot
         sr_keywords = r"(?i)(service request|\bsr\b|grant is awaiting|approve or deny|grant access|access request)"
         is_sr = is_sr | filtered_df["subject"].astype(str).str.contains(
             sr_keywords, na=False
@@ -380,10 +357,7 @@ c3.metric(
     f"{sla_metrics['breach_count']} Failed",
     delta_color="inverse",
 )
-if avg_res_hours is None or pd.isna(avg_res_hours):
-    # c4.metric("Avg Resolution Duration", "")
-    pass
-else:
+if avg_res_hours is not None and not pd.isna(avg_res_hours):
     c4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
 
 
@@ -410,11 +384,14 @@ rename_map = {
     "status": "State Status",
 }
 
+# Ensure all target display columns exist before filtering dataframe
+available_columns = [col for col in columns_to_show if col in filtered_df.columns]
+
 breached_records = filtered_df[filtered_df["sla_breached"] == 1][
-    columns_to_show
+    available_columns
 ].rename(columns=rename_map)
 compliant_records = filtered_df[filtered_df["sla_breached"] == 0][
-    columns_to_show
+    available_columns
 ].rename(columns=rename_map)
 
 tab_compliant, tab_breached = st.tabs(
@@ -447,7 +424,7 @@ st.markdown("---")
 st.subheader("🛡️ Infrastructure Noise Clusters & Top 5 Systemic Alerts")
 st.caption("Scans high-volume repeating noise clusters to construct air-gapped security playbooks and engineering efficiency strategies.")
 
-if st.button("🔮 Analyze Infrastructure Noise Clusters & Security Exposure"):
+if st.button("🔮 Analyze Infrastructure Noise Clusters & Security Exposure", key="root_cause_btn"):
     with st.spinner(
         "Extracting pattern matrices and driving local inference weights..."
     ):
@@ -511,7 +488,7 @@ coach_target = st.selectbox(
     sorted(df_filtered_base["agent"].dropna().unique().tolist()),
 )
 
-if st.button("🔮 Construct AI Coaching Assessment Profile"):
+if st.button("🔮 Construct AI Coaching Assessment Profile", key="coaching_btn"):
     with st.spinner(
         "Processing historical ticket logs inside local LLM context window..."
     ):
@@ -527,8 +504,7 @@ show_ai_investigator_ui(filtered_df)
 # Section 9: Automated Report Generation Block
 st.markdown("---")
 st.subheader("📋 Automated Operations Executive Review Compiler")
-if st.button("📥 Compile Standalone Executive HTML Operations Review File"):
-    # compiled_path = AutomatedReportGenerator.compile_executive_html(filtered_df)
+if st.button("📥 Compile Standalone Executive HTML Operations Review File", key="report_gen_btn"):
     report_path = AutomatedReportGenerator.compile_executive_html(
         filtered_df, selected_agent
     )
