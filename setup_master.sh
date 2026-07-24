@@ -1,56 +1,96 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # ==============================================================================
-# 🛡️ Enterprise SRE & IT Operations Intelligence Platform - Deployment Script
+# Enterprise SRE & IT Operations Intelligence Platform - Setup & Launch Script
+# Developed by Team Gamma (US SRE Pod)
 # ==============================================================================
 
-set -e # Exit immediately if any command exits with a non-zero status
+set -e
 
-echo "======================================================================"
-echo "🛡️ Starting SRE & IT Operations Intelligence Platform Deployment Pipeline"
-echo "======================================================================"
+# System Terminal Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-# Step 1: Check Python installation environment
+MODEL_NAME="qwen2.5:3b"
+
+echo -e "${BLUE}======================================================================${NC}"
+echo -e "${BLUE}  🛡️  Enterprise SRE & IT Operations Intelligence Platform Setup       ${NC}"
+echo -e "${BLUE}  Developed by Team Gamma (US SRE Pod)                                ${NC}"
+echo -e "${BLUE}======================================================================${NC}\n"
+
+# 1. Check Python installation
 if ! command -v python3 &> /dev/null; then
-    echo "❌ Error: python3 is required but not found on this system."
+    echo -e "${RED}❌ Error: python3 is not installed. Please install Python 3.9+ and retry.${NC}"
     exit 1
 fi
 
-# Step 2: Establish isolated Python Virtual Environment
-echo "📦 Initializing clean Python virtual environment (venv)..."
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
-    echo "✅ Virtual environment created successfully."
+echo -e "${GREEN}✓ Python 3 environment verified: $(python3 --version)${NC}"
+
+# 2. Check and prompt for wkhtmltopdf (Required for PDF Report Export)
+if ! command -v wkhtmltopdf &> /dev/null; then
+    echo -e "${YELLOW}⚠️  Warning: 'wkhtmltopdf' is not installed. PDF export capabilities require it.${NC}"
+    echo -e "${YELLOW}👉 To fix on Debian/Ubuntu Linux run: sudo apt-get update && sudo apt-get install -y wkhtmltopdf${NC}\n"
 else
-    echo "ℹ️ Existing venv directory detected. Skipping creation layer."
+    echo -e "${GREEN}✓ System PDF Rendering Engine (wkhtmltopdf) verified.${NC}"
 fi
 
-# Step 3: Activate virtual environment context
-echo "🔄 Activating local environment architecture..."
-source venv/bin/activate
+# 3. Create required runtime project directories
+echo -e "${BLUE}📁 Verifying runtime project directory structure...${NC}"
+mkdir -p data reports exports ai analytics utils
 
-# Step 4: Upgrade pipeline installer and deploy dependency definitions
-echo "📥 Installing required production Python packages..."
-pip install --upgrade pip
-pip install streamlit pandas plotly requests
-
-# Step 5: Verify localized application directory safety checks
-echo "📂 Validating filesystem folder layout structures..."
-mkdir -p data reports analytics utils ai
-
-# Step 6: Verify Ollama runtime environment configurations
-echo "🧠 Checking local AI inference layer configuration..."
-if command -v ollama &> /dev/null; then
-    echo "ℹ️ Local Ollama binary detected. Ensuring target model engine weights exist..."
-    # Asynchronously pull the hyper-fast 3B parameter model in the background
-    ollama pull qwen2.5:3b &
-else
-    echo "⚠️ Warning: Ollama backend binary not found globally."
-    echo "Please ensure an active Ollama daemon is listening on port 11434 if using AI modules."
+# 4. Virtual Environment Setup
+VENV_DIR="venv"
+if [ ! -d "$VENV_DIR" ]; then
+    echo -e "${YELLOW}⚙️  Creating Python virtual environment in ./${VENV_DIR}...${NC}"
+    python3 -m venv $VENV_DIR
 fi
 
-# Step 7: Fire up the live interactive framework portal
-echo "======================================================================"
-echo "🚀 Booting Up Enterprise Operations Control Panel Dashboard Interface..."
-echo "======================================================================"
-python3 -m streamlit run app.py --server.port 8501
+echo -e "${BLUE}🔄 Activating Python virtual environment...${NC}"
+source $VENV_DIR/bin/activate
+
+# 5. Install and Upgrade Python Packages
+echo -e "${BLUE}📦 Upgrading pip and installing production dependencies...${NC}"
+pip install --upgrade pip --quiet
+pip install streamlit pandas plotly requests pdfkit --quiet
+
+echo -e "${GREEN}✓ Python dependencies successfully installed.${NC}"
+
+# 6. Verify Local Ollama Inference Subsystem
+echo -e "\n${BLUE}🤖 Checking local Ollama LLM service daemon...${NC}"
+if ! command -v ollama &> /dev/null; then
+    echo -e "${RED}❌ Error: Ollama is not installed or not in system PATH.${NC}"
+    echo -e "${YELLOW}👉 Install Ollama locally via: curl -fsSL https://ollama.com/install.sh | sh${NC}"
+    exit 1
+fi
+
+# Ensure Ollama daemon is active
+if ! pgrep -x "ollama" > /dev/null && ! curl -s http://localhost:11434/api/tags > /dev/null; then
+    echo -e "${YELLOW}⚙️  Starting background Ollama service daemon...${NC}"
+    ollama serve > /dev/null 2>&1 &
+    sleep 3
+fi
+
+# Check and pull active model weights
+echo -e "${BLUE}🧠 Verifying local LLM model weights (${MODEL_NAME})...${NC}"
+if ! ollama list | grep -q "$MODEL_NAME"; then
+    echo -e "${YELLOW}📥 Model '${MODEL_NAME}' not found locally. Downloading weights (this may take a minute)...${NC}"
+    ollama pull $MODEL_NAME
+else
+    echo -e "${GREEN}✓ Local model '${MODEL_NAME}' is ready.${NC}"
+fi
+
+# Pre-warm model in memory
+echo -e "${BLUE}🔥 Pre-warming local model memory allocation...${NC}"
+curl -s -X POST http://localhost:11434/api/generate \
+    -H "Content-Type: application/json" \
+    -d "{\"model\": \"$MODEL_NAME\", \"prompt\": \"ping\", \"stream\": false}" > /dev/null || true
+
+# 7. Launch Dashboard Interface
+echo -e "\n${GREEN}======================================================================${NC}"
+echo -e "${GREEN}🚀 All systems verified! Launching Streamlit Operations Dashboard...  ${NC}"
+echo -e "${GREEN}======================================================================${NC}\n"
+
+streamlit run app.py
