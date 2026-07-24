@@ -350,7 +350,7 @@ with tab_breached:
 
 # Section 4: Systemic Root Cause & Security Compliance Diagnostics
 st.markdown("---")
-st.subheader("🛡️ Infrastructure Noise Clusters & Top 5 Systemic Alerts")
+st.subheader("🛡️ Infrastructure Noise & Top 5 Systemic Alerts")
 st.caption("Scans high-volume repeating noise clusters to construct air-gapped security playbooks and engineering efficiency strategies.")
 
 if st.button("🔮 Analyze Infrastructure Noise Clusters & Security Exposure"):

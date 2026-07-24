@@ -54,49 +54,6 @@ def show_ai_investigator_ui(df: pd.DataFrame):
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            col_actions1, col_actions2 = st.columns(2)
-            
-            with col_actions1:
-                if st.button("🚀 Execute Forensic Ingestion Audit", width="stretch"):
-                    with st.spinner("Invoking local LLM model weights..."):
-                        analyzer = LocalTicketAnalyzer()
-                        findings = analyzer.run_ticket_forensics(ticket)
-                        
-                        if "error" in findings:
-                            st.error(findings["error"])
-                        else:
-                            st.success("Analysis Complete.")
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                st.markdown("### 📋 Incident Diagnostics")
-                                st.markdown(f"**Incident Summary:**\n{findings.get('Incident Summary')}")
-                                st.markdown(f"**Root Cause Analysis:**\n{findings.get('Root Cause Analysis')}")
-                            with c2:
-                                st.markdown("### 🛠️ Handling Quality Review")
-                                st.markdown(f"**Resolution Quality Review:**\n{findings.get('Resolution Quality Review')}")
-                                
-                            with st.expander("View Raw LLM Unparsed Generative Output"):
-                                st.code(findings.get("Raw"))
-                                
-            with col_actions2:
-                if st.button("🧠 Surface Similar Historical Solved Tickets", width="stretch"):
-                    with st.spinner("Calculating vector similarity distances natively..."):
-                        v_store = LocalTicketVectorStore()
-                        similar_cases = v_store.surface_similar_resolutions(
-                            ticket.get("subject", ""), 
-                            ticket.get("description", "")
-                        )
-                        
-                        if not similar_cases:
-                            st.warning("No semantically overlapping historical cases found inside local database.")
-                        else:
-                            st.success(f"Discovered {len(similar_cases)} relevant matching incident profiles:")
-                            for idx, case in enumerate(similar_cases):
-                                with st.container():
-                                    st.markdown(f"##### {idx+1}. Ticket #{case['ticket_id']} (Match Confidence: {case['confidence']}% )")
-                                    st.markdown(f"**Subject Alignment:** {case['subject']}")
-                                    st.markdown(f"**Verified Fix Applied by {case['agent']}:**")
-                                    st.info(case['resolution_note'])
-                                    st.markdown("---")
+
         else:
             st.error("Ticket ID not discovered inside the current operational scope.")
