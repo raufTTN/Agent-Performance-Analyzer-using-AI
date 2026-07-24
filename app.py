@@ -180,7 +180,7 @@ if isinstance(selected_date_range, tuple) and len(selected_date_range) == 2:
 if selected_company != "All Companies":
     filtered_df = filtered_df[filtered_df[company_column] == selected_company]
 
-# --- 🚀 DYNAMIC SR vs INCIDENT ROUTING ---
+# --- DYNAMIC SR vs INCIDENT ROUTING ---
 if selected_type != "All Types (SR & Incident)":
     is_sr = pd.Series(False, index=filtered_df.index)
 
@@ -229,6 +229,7 @@ rankings_df = OperationsLeaderboardScorer.compile_weighted_rankings(
 
 # --- MAIN RENDER FRAME UI ---
 st.title("🛡️ Enterprise SRE & IT Operations Intelligence Platform")
+st.markdown("<small style='color: #38bdf8; font-weight: 600;'>Developed by Team Gamma (US SRE Pod)</small>", unsafe_allow_html=True)
 st.caption(
     f"Agent Performance Analyzer Module Pipeline | Node: Air-Gapped Local | Model Active: `{OLLAMA_MODEL}`"
 )
@@ -502,20 +503,56 @@ if st.button("🔮 Construct AI Coaching Assessment Profile", key="coaching_btn"
 # Section 8: Deep Forensic Ticket Investigation Module Injection Anchor
 show_ai_investigator_ui(filtered_df)
 
-# Section 9: Automated Report Generation Block
+# Section 9: Automated Operations Executive Review Compiler (Dual Export: HTML & PDF)
 st.markdown("---")
 st.subheader("📋 Automated Operations Executive Review Compiler")
-if st.button("📥 Compile Standalone Executive HTML Operations Review File", key="report_gen_btn"):
-    report_path = AutomatedReportGenerator.compile_executive_html(
-        filtered_df, selected_agent
-    )
-    if report_path and os.path.exists(report_path):
-        st.success(f"HTML executive review file saved successfully to: `{report_path}`")
-        with open(report_path, "r", encoding="utf-8") as f:
-            html_bytes = f.read()
+st.caption("Generate and download standardized executive performance reports in HTML or PDF formats.")
+
+col_comp1, col_comp2 = st.columns(2)
+
+with col_comp1:
+    if st.button("🌐 Compile Executive HTML Report", key="compile_html_btn", use_container_width=True):
+        html_path = AutomatedReportGenerator.compile_executive_html(filtered_df, selected_agent)
+        if html_path and os.path.exists(html_path):
+            st.session_state["generated_html_path"] = html_path
+            st.success(f"HTML review generated: `{html_path}`")
+        else:
+            st.error("HTML Report compilation failed or returned empty scope.")
+
+    if "generated_html_path" in st.session_state and os.path.exists(st.session_state["generated_html_path"]):
+        with open(st.session_state["generated_html_path"], "r", encoding="utf-8") as f:
+            html_data = f.read()
         st.download_button(
             label="💾 Download Compiled Executive HTML Report",
-            data=html_bytes,
-            file_name=os.path.basename(report_path),
-            mime="text/html"
+            data=html_data,
+            file_name=os.path.basename(st.session_state["generated_html_path"]),
+            mime="text/html",
+            key="dl_html_btn",
+            use_container_width=True
+        )
+
+with col_comp2:
+    if st.button("📄 Compile Executive PDF Report", key="compile_pdf_btn", use_container_width=True):
+        # Auto-compile HTML base if it doesn't exist yet in current session
+        if "generated_html_path" not in st.session_state or not os.path.exists(st.session_state["generated_html_path"]):
+            st.session_state["generated_html_path"] = AutomatedReportGenerator.compile_executive_html(filtered_df, selected_agent)
+
+        with st.spinner("Converting HTML document to PDF format..."):
+            pdf_path = AutomatedReportGenerator.compile_executive_pdf(st.session_state["generated_html_path"])
+            if pdf_path and os.path.exists(pdf_path):
+                st.session_state["generated_pdf_path"] = pdf_path
+                st.success(f"PDF review generated: `{pdf_path}`")
+            else:
+                st.error("Failed to compile PDF. Please verify 'wkhtmltopdf' is installed on your Linux system (`sudo apt install wkhtmltopdf`).")
+
+    if "generated_pdf_path" in st.session_state and os.path.exists(st.session_state["generated_pdf_path"]):
+        with open(st.session_state["generated_pdf_path"], "rb") as f:
+            pdf_bytes = f.read()
+        st.download_button(
+            label="💾 Download Compiled Executive PDF Report",
+            data=pdf_bytes,
+            file_name=os.path.basename(st.session_state["generated_pdf_path"]),
+            mime="application/pdf",
+            key="dl_pdf_btn",
+            use_container_width=True
         )
