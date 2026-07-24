@@ -1,6 +1,10 @@
+import json
 from datetime import datetime
 import pandas as pd
-from config import REPORTS_DIR
+import requests
+
+from analytics.scoring import OperationsLeaderboardScorer
+from config import LLM_TIMEOUT, OLLAMA_API_URL, OLLAMA_MODEL, REPORTS_DIR
 
 
 class AutomatedReportGenerator:
@@ -79,6 +83,13 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
             total_tickets, compliance, total_breaches, avg_resolution, total_effort, total_sr, total_incidents,
             agent_rankings, ai_remarks, company_dist, priority_dist, type_dist, selected_agent
         )
+
+        filename = f"executive_review_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+        report_path = REPORTS_DIR / filename
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+
+        return str(report_path)
 
     @staticmethod
     def _build_html(total, compliance, breaches, avg_res, total_effort, total_sr, total_incidents, agent_rankings, remarks, c_dist, p_dist, t_dist, scope):

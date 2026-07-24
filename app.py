@@ -1,3 +1,4 @@
+import os
 # pyrefly: ignore [missing-import]
 import streamlit as st
 import pandas as pd
@@ -508,4 +509,13 @@ if st.button("📥 Compile Standalone Executive HTML Operations Review File", ke
     report_path = AutomatedReportGenerator.compile_executive_html(
         filtered_df, selected_agent
     )
-    st.success(f"HTML executive review file saved successfully to: `{report_path}`")
+    if report_path and os.path.exists(report_path):
+        st.success(f"HTML executive review file saved successfully to: `{report_path}`")
+        with open(report_path, "r", encoding="utf-8") as f:
+            html_bytes = f.read()
+        st.download_button(
+            label="💾 Download Compiled Executive HTML Report",
+            data=html_bytes,
+            file_name=os.path.basename(report_path),
+            mime="text/html"
+        )
