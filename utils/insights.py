@@ -204,13 +204,27 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                 status_color = "#10b981" if status == "Optimally Utilized" else "#ef4444" if status == "Overutilized" else "#f59e0b"
                 
                 agent_util_html = f"""
-                <div class="card" style="margin-bottom: 20px; background-color: #f8fafc; border-left: 4px solid {status_color};">
-                    <div class="section-title">Agent Utilization Summary</div>
-                    <table style="width: 100%; font-size: 14px; border: none;">
-                        <tr style="background: none;">
-                            <td style="border: none; padding: 5px;"><strong>Total Effort Logged:</strong> {effort_str}</td>
-                            <td style="border: none; padding: 5px;"><strong>Total Tickets Handled:</strong> {tickets}</td>
-                            <td style="border: none; padding: 5px;"><strong>Capacity Status:</strong> <span style="color: {status_color}; font-weight: bold;">{status}</span></td>
+                <div class="card util-card" style="border-left-color: {status_color}; margin-bottom: 25px;">
+                    <table style="width: 100%; border: none; margin: 0; padding: 0;">
+                        <tr>
+                            <td style="border: none; padding: 0; vertical-align: middle;">
+                                <div class="section-title" style="border:none; margin:0; padding:0; font-size: 18px;">Agent Capacity & Utilization Profile</div>
+                            </td>
+                            <td style="border: none; padding: 0; text-align: right; vertical-align: middle;">
+                                <span class="badge" style="background-color: {status_color}; color: #ffffff; font-size: 12px; padding: 6px 12px;">{status}</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <table style="width: 100%; border: none; margin-top: 20px;">
+                        <tr>
+                            <td width="50%" style="border: none; padding: 0;">
+                                <div class="card-title">Total Effort Logged</div>
+                                <div class="card-value">{effort_str}</div>
+                            </td>
+                            <td width="50%" style="border: none; padding: 0;">
+                                <div class="card-title">Total Tickets Handled</div>
+                                <div class="card-value">{tickets}</div>
+                            </td>
                         </tr>
                     </table>
                 </div>
@@ -223,45 +237,63 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
             <meta charset="utf-8">
             <title>Enterprise SRE & IT Operations Intelligence Report</title>
             <style>
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
                 
                 @page {{
                     size: A4;
-                    margin: 0.8cm;
+                    margin: 1.2cm;
+                }}
+
+                @media print {{
+                    .card {{ page-break-inside: avoid; }}
+                    tr {{ page-break-inside: avoid; page-break-after: auto; }}
+                    table {{ page-break-inside: auto; }}
+                    thead {{ display: table-header-group; }}
                 }}
 
                 body {{
-                    font-family: 'Inter', Helvetica, Arial, sans-serif;
+                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
                     background-color: #ffffff;
-                    color: #0f172a;
+                    color: #1e293b;
                     margin: 0;
-                    padding: 10px;
+                    padding: 0;
+                    line-height: 1.5;
                 }}
                 
                 .header {{
-                    background: #0f172a;
+                    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
                     color: #ffffff;
-                    padding: 20px 25px;
-                    border-radius: 8px;
-                    margin-bottom: 20px;
+                    padding: 25px 30px;
+                    border-radius: 6px;
+                    margin-bottom: 25px;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
                 }}
                 
-                .header h1 {{ margin: 0 0 4px 0; font-size: 22px; font-weight: 700; }}
-                .sub-author {{ margin: 0 0 10px 0; font-size: 11px; color: #38bdf8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }}
-                .header p {{ margin: 0; color: #cbd5e1; font-size: 12px; }}
+                .header h1 {{ margin: 0 0 6px 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }}
+                .sub-author {{ margin: 0 0 12px 0; font-size: 12px; color: #38bdf8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }}
+                .header p {{ margin: 0; color: #94a3b8; font-size: 13px; font-weight: 500; }}
+                .header strong {{ color: #e2e8f0; }}
                 
                 .grid-kpi {{
                     width: 100%;
-                    margin-bottom: 20px;
+                    margin-bottom: 25px;
                     border-collapse: separate;
-                    border-spacing: 10px;
+                    border-spacing: 12px;
+                    margin-left: -12px;
+                    margin-right: -12px;
                 }}
 
                 .card {{
-                    background: #f8fafc;
-                    padding: 15px;
-                    border-radius: 8px;
+                    background: #ffffff;
+                    padding: 20px;
+                    border-radius: 6px;
                     border: 1px solid #e2e8f0;
+                    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+                }}
+                
+                .util-card {{
+                    background: #f8fafc;
+                    border-left: 5px solid #e2e8f0;
                 }}
                 
                 .card-title {{
@@ -269,21 +301,25 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                     text-transform: uppercase;
                     font-weight: 600;
                     color: #64748b;
-                    margin-bottom: 6px;
+                    margin-bottom: 8px;
+                    letter-spacing: 0.5px;
                 }}
                 
                 .card-value {{
-                    font-size: 20px;
+                    font-size: 24px;
                     font-weight: 700;
                     color: #0f172a;
+                    letter-spacing: -0.5px;
                 }}
                 
                 .badge {{
                     display: inline-block;
-                    padding: 2px 8px;
-                    border-radius: 10px;
-                    font-size: 10px;
+                    padding: 3px 8px;
+                    border-radius: 12px;
+                    font-size: 11px;
                     font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
                 }}
                 .badge-success {{ background: #dcfce7; color: #166534; }}
                 .badge-danger {{ background: #fee2e2; color: #991b1b; }}
@@ -292,38 +328,42 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                 table.data-table {{
                     width: 100%;
                     border-collapse: collapse;
-                    margin-top: 10px;
+                    margin-top: 15px;
                     border: 1px solid #e2e8f0;
+                    border-radius: 4px;
+                    overflow: hidden;
                 }}
                 
                 table.data-table th, table.data-table td {{
-                    padding: 10px 12px;
+                    padding: 12px 15px;
                     text-align: left;
                     border-bottom: 1px solid #e2e8f0;
-                    font-size: 12px;
+                    font-size: 13px;
                 }}
                 
                 table.data-table th {{
-                    background-color: #f1f5f9;
+                    background-color: #f8fafc;
                     font-weight: 600;
                     text-transform: uppercase;
                     color: #475569;
+                    font-size: 11px;
+                    letter-spacing: 0.5px;
                 }}
                 
-                tr.row-alt {{ background-color: #f8fafc; }}
+                tr.row-alt {{ background-color: #fcfcfc; }}
                 
                 .section-title {{
-                    font-size: 15px;
+                    font-size: 16px;
                     font-weight: 700;
                     margin-top: 0;
-                    margin-bottom: 12px;
+                    margin-bottom: 15px;
                     color: #0f172a;
-                    border-bottom: 2px solid #e2e8f0;
-                    padding-bottom: 6px;
+                    border-bottom: 1px solid #e2e8f0;
+                    padding-bottom: 10px;
                 }}
                 
-                ul {{ margin: 0; padding-left: 18px; color: #475569; font-size: 12px; }}
-                li {{ margin-bottom: 4px; }}
+                ul {{ margin: 0; padding-left: 20px; color: #475569; font-size: 13px; }}
+                li {{ margin-bottom: 6px; }}
             </style>
         </head>
         <body>
