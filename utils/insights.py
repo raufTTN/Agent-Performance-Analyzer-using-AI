@@ -12,7 +12,9 @@ from config import LLM_TIMEOUT, OLLAMA_API_URL, OLLAMA_MODEL, REPORTS_DIR
 class AutomatedReportGenerator:
 
     @staticmethod
-    def compile_executive_html(df: pd.DataFrame, selected_agent: str = "All Agents") -> str:
+    def compile_executive_html(
+        df: pd.DataFrame, selected_agent: str = "All Agents"
+    ) -> str:
         """
         Compiles all scoped metrics, agent scorecards, and AI remarks into a standalone HTML report.
         """
@@ -26,18 +28,33 @@ class AutomatedReportGenerator:
             agent_df = df.copy()
 
         # Extract Date Range dynamically
-        if "created_dt" in agent_df.columns and not agent_df["created_dt"].dropna().empty:
-            min_d = agent_df["created_dt"].min().strftime('%d %b %Y')
-            max_d = agent_df["created_dt"].max().strftime('%d %b %Y')
+        if (
+            "created_dt" in agent_df.columns
+            and not agent_df["created_dt"].dropna().empty
+        ):
+            min_d = agent_df["created_dt"].min().strftime("%d %b %Y")
+            max_d = agent_df["created_dt"].max().strftime("%d %b %Y")
             date_range_str = f"{min_d} – {max_d}"
         else:
             date_range_str = "Full History Scope"
 
         # 1. Executive Metrics Calculations
         total_tickets = len(agent_df)
-        total_breaches = int(agent_df["sla_breached"].sum()) if "sla_breached" in agent_df.columns else 0
-        compliance = round(((total_tickets - total_breaches) / total_tickets) * 100, 1) if total_tickets > 0 else 100.0
-        avg_resolution = round(agent_df["resolution_hours"].mean(), 2) if "resolution_hours" in agent_df.columns else 0
+        total_breaches = (
+            int(agent_df["sla_breached"].sum())
+            if "sla_breached" in agent_df.columns
+            else 0
+        )
+        compliance = (
+            round(((total_tickets - total_breaches) / total_tickets) * 100, 1)
+            if total_tickets > 0
+            else 100.0
+        )
+        avg_resolution = (
+            round(agent_df["resolution_hours"].mean(), 2)
+            if "resolution_hours" in agent_df.columns
+            else 0
+        )
         # total_effort = round(agent_df["effort_mins"].sum(), 0) if "effort_mins" in agent_df.columns else 0
         total_effort_mins = round(agent_df["effort_mins"].sum(), 0)
         total_effort_hours = round(total_effort_mins / 60, 2)
@@ -45,12 +62,21 @@ class AutomatedReportGenerator:
         # Calculate SR vs Incident count dynamically
         is_sr = pd.Series(False, index=agent_df.index)
         for col in agent_df.columns:
-            if col.lower().strip() in ['category', 'type', 'ticket_type', 'ticket type']:
-                is_sr = is_sr | agent_df[col].astype(str).str.contains(r"(?i)(service request|\bsr\b)", na=False)
+            if col.lower().strip() in [
+                "category",
+                "type",
+                "ticket_type",
+                "ticket type",
+            ]:
+                is_sr = is_sr | agent_df[col].astype(str).str.contains(
+                    r"(?i)(service request|\bsr\b)", na=False
+                )
         if "subject" in agent_df.columns:
             sr_keywords = r"(?i)(service request|\bsr\b|grant is awaiting|approve or deny|grant access|access request)"
-            is_sr = is_sr | agent_df["subject"].astype(str).str.contains(sr_keywords, na=False)
-            
+            is_sr = is_sr | agent_df["subject"].astype(str).str.contains(
+                sr_keywords, na=False
+            )
+
         total_sr = int(is_sr.sum())
         total_incidents = total_tickets - total_sr
 
@@ -88,27 +114,38 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                 "prompt": prompt,
                 "stream": False,
                 "format": "json",
-                "options": {"temperature": 0.2, "num_predict": 500}
+                "options": {"temperature": 0.2, "num_predict": 500},
             }
             try:
                 res = requests.post(OLLAMA_API_URL, json=payload, timeout=LLM_TIMEOUT)
                 if res.status_code == 200:
-                    raw_resp = res.json().get('response', '{}')
+                    raw_resp = res.json().get("response", "{}")
                     ai_remarks = json.loads(raw_resp)
             except Exception:
                 ai_remarks = {}
 
         # 5. Build HTML Content
         html_content = AutomatedReportGenerator._build_html(
-            total_tickets, compliance, total_breaches, avg_resolution,
-total_effort_mins, total_effort_hours,
-            total_sr, total_incidents, agent_rankings, ai_remarks,
-            company_dist, priority_dist, type_dist, selected_agent, date_range_str
+            total_tickets,
+            compliance,
+            total_breaches,
+            avg_resolution,
+            total_effort_mins,
+            total_effort_hours,
+            total_sr,
+            total_incidents,
+            agent_rankings,
+            ai_remarks,
+            company_dist,
+            priority_dist,
+            type_dist,
+            selected_agent,
+            date_range_str,
         )
 
         filename = f"executive_review_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
         report_path = REPORTS_DIR / filename
-        
+
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(html_content)
 
@@ -125,14 +162,14 @@ total_effort_mins, total_effort_hours,
         pdf_path = html_path.replace(".html", ".pdf")
 
         options = {
-            'page-size': 'A4',
-            'margin-top': '0.5in',
-            'margin-right': '0.5in',
-            'margin-bottom': '0.5in',
-            'margin-left': '0.5in',
-            'encoding': "UTF-8",
-            'enable-local-file-access': None,
-            'no-outline': None
+            "page-size": "A4",
+            "margin-top": "0.5in",
+            "margin-right": "0.5in",
+            "margin-bottom": "0.5in",
+            "margin-left": "0.5in",
+            "encoding": "UTF-8",
+            "enable-local-file-access": None,
+            "no-outline": None,
         }
 
         try:
@@ -144,32 +181,32 @@ total_effort_mins, total_effort_hours,
 
     @staticmethod
     def _build_html(
-    total,
-    compliance,
-    breaches,
-    avg_res,
-    total_effort_mins,
-    total_effort_hours,
-    total_sr,
-    total_incidents,
-    agent_rankings,
-    remarks,
-    c_dist,
-    p_dist,
-    t_dist,
-    scope,
-    date_range
-):
-        now_str = datetime.now().strftime('%d %b %Y, %H:%M')
+        total,
+        compliance,
+        breaches,
+        avg_res,
+        total_effort_mins,
+        total_effort_hours,
+        total_sr,
+        total_incidents,
+        agent_rankings,
+        remarks,
+        c_dist,
+        p_dist,
+        t_dist,
+        scope,
+        date_range,
+    ):
+        now_str = datetime.now().strftime("%d %b %Y, %H:%M")
 
         # Generate rows for agent scorecard table
         agent_rows = ""
         if not agent_rankings.empty:
             for i, row in agent_rankings.reset_index(drop=True).iterrows():
-                agent_name = row.get('agent', 'Unknown')
-                score = row.get('Performance_Score', 'N/A')
-                vol = row.get('Tickets_Handled', 0)
-                res_hr = row.get('Avg_Resolution_Hours', 0)
+                agent_name = row.get("agent", "Unknown")
+                score = row.get("Performance_Score", "N/A")
+                vol = row.get("Tickets_Handled", 0)
+                res_hr = row.get("Avg_Resolution_Hours", 0)
                 remark = remarks.get(agent_name, "Solid operational performance.")
 
                 row_class = "row-alt" if i % 2 != 0 else ""
@@ -187,7 +224,9 @@ total_effort_mins, total_effort_hours,
         def dict_to_html_list(d):
             if not d:
                 return "<li>No data available</li>"
-            return "".join([f"<li><strong>{k}:</strong> {v}</li>" for k, v in list(d.items())[:5]])
+            return "".join(
+                [f"<li><strong>{k}:</strong> {v}</li>" for k, v in list(d.items())[:5]]
+            )
 
         return f"""
         <!DOCTYPE html>
@@ -336,13 +375,13 @@ total_effort_mins, total_effort_hours,
                     <td width="33%">
                         <div class="card">
                             <div class="card-title">Total Effort Spent</div>
-<div class="card-value">
-    {total_effort_hours}
-    <span style="font-size:12px; color:#64748b;">Hrs</span>
-</div>
-<div style="font-size:10px; color:#64748b; margin-top:4px;">
-    {total_effort_mins} Mins
-</div>
+                        <div class="card-value">
+                            {total_effort_hours}
+                            <span style="font-size:12px; color:#64748b;">Hrs</span>
+                        </div>
+                        <div style="font-size:10px; color:#64748b; margin-top:4px;">
+                            {total_effort_mins} Mins
+                        </div>
                         </div>
                     </td>
                     <td width="33%">

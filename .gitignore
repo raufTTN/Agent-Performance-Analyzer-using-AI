@@ -13,3 +13,5 @@ reports/*.html
 # Streamlit Local Configurations & Cache
 .streamlit/
 EOF
+
+echo "reports/*.pdf"
