@@ -38,7 +38,9 @@ class AutomatedReportGenerator:
         total_breaches = int(agent_df["sla_breached"].sum()) if "sla_breached" in agent_df.columns else 0
         compliance = round(((total_tickets - total_breaches) / total_tickets) * 100, 1) if total_tickets > 0 else 100.0
         avg_resolution = round(agent_df["resolution_hours"].mean(), 2) if "resolution_hours" in agent_df.columns else 0
-        total_effort = round(agent_df["effort_mins"].sum(), 0) if "effort_mins" in agent_df.columns else 0
+        # total_effort = round(agent_df["effort_mins"].sum(), 0) if "effort_mins" in agent_df.columns else 0
+        total_effort_mins = round(agent_df["effort_mins"].sum(), 0)
+        total_effort_hours = round(total_effort_mins / 60, 2)
 
         # Calculate SR vs Incident count dynamically
         is_sr = pd.Series(False, index=agent_df.index)
@@ -98,7 +100,8 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
 
         # 5. Build HTML Content
         html_content = AutomatedReportGenerator._build_html(
-            total_tickets, compliance, total_breaches, avg_resolution, total_effort,
+            total_tickets, compliance, total_breaches, avg_resolution,
+total_effort_mins, total_effort_hours,
             total_sr, total_incidents, agent_rankings, ai_remarks,
             company_dist, priority_dist, type_dist, selected_agent, date_range_str
         )
@@ -140,7 +143,23 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
             return ""
 
     @staticmethod
-    def _build_html(total, compliance, breaches, avg_res, total_effort, total_sr, total_incidents, agent_rankings, remarks, c_dist, p_dist, t_dist, scope, date_range):
+    def _build_html(
+    total,
+    compliance,
+    breaches,
+    avg_res,
+    total_effort_mins,
+    total_effort_hours,
+    total_sr,
+    total_incidents,
+    agent_rankings,
+    remarks,
+    c_dist,
+    p_dist,
+    t_dist,
+    scope,
+    date_range
+):
         now_str = datetime.now().strftime('%d %b %Y, %H:%M')
 
         # Generate rows for agent scorecard table
@@ -317,7 +336,13 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                     <td width="33%">
                         <div class="card">
                             <div class="card-title">Total Effort Spent</div>
-                            <div class="card-value">{total_effort} <span style="font-size:12px; color:#64748b;">Mins</span></div>
+<div class="card-value">
+    {total_effort_hours}
+    <span style="font-size:12px; color:#64748b;">Hrs</span>
+</div>
+<div style="font-size:10px; color:#64748b; margin-top:4px;">
+    {total_effort_mins} Mins
+</div>
                         </div>
                     </td>
                     <td width="33%">
