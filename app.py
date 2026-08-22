@@ -15,6 +15,7 @@ from analytics.insights import LocalAgentCoachingEngine
 from analytics.ticket_explorer import show_ai_investigator_ui
 from utils.insights import AutomatedReportGenerator
 from analytics.root_cause import SystemicRootCauseEngine
+from analytics.capacity import AgentCapacityProfiler
 
 # Initialize local database schema tables setup handshake protocol immediately
 initialize_database()
@@ -178,6 +179,9 @@ if selected_type != "All Types (SR & Incident)":
     elif selected_type == "Incident":
         filtered_df = filtered_df[~is_sr]
 
+# Calculate utilization metrics on the team-wide data (before filtering for specific agent)
+team_utilization_df = AgentCapacityProfiler.calculate_utilization(filtered_df)
+
 # Apply Agent Filter
 if selected_agent != "All Agents":
     filtered_df = filtered_df[filtered_df["agent"] == selected_agent]
@@ -274,6 +278,55 @@ with h2:
         st.info(f"**{fastest_agent['agent']}** leading response operations with a handling speed averaging **{fastest_agent['Avg_Resolution_Hours']} Hours** per ticket.")
     else:
         st.caption("Insufficient execution duration footprints mapped to extract speed parameters.")
+
+# Section 1.5: Agent Utilization Profile (if specific agent selected)
+if selected_agent != "All Agents" and not team_utilization_df.empty:
+    st.markdown("---")
+    st.subheader("📊 Agent Capacity & Utilization Profile")
+    agent_util_row = team_utilization_df[team_utilization_df['agent'] == selected_agent]
+    
+    if not agent_util_row.empty:
+        row_data = agent_util_row.iloc[0]
+        
+        # Format effort to hours and mins
+        total_mins = int(row_data['Total_Effort_Mins'])
+        hrs, mins = divmod(total_mins, 60)
+        effort_str = f"{hrs}h {mins}m"
+        
+        tickets = int(row_data['Total_Tickets'])
+        status = row_data['Utilization_Status']
+        
+        if status == "Underutilized":
+            status_color = "#eab308" # Yellow
+        elif status == "Overutilized":
+            status_color = "#ef4444" # Red
+        else:
+            status_color = "#22c55e" # Green
+            
+        uc1, uc2, uc3 = st.columns(3)
+        with uc1:
+            st.markdown(f"""
+            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center;">
+                <h4 style="margin:0; color: #94a3b8; font-size: 14px;">Total Effort Logged</h4>
+                <h2 style="margin: 10px 0 0 0; font-size: 28px; color: #f8fafc;">{effort_str}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with uc2:
+            st.markdown(f"""
+            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center;">
+                <h4 style="margin:0; color: #94a3b8; font-size: 14px;">Total Tickets Handled</h4>
+                <h2 style="margin: 10px 0 0 0; font-size: 28px; color: #f8fafc;">{tickets}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with uc3:
+            st.markdown(f"""
+            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center;">
+                <h4 style="margin:0; color: #94a3b8; font-size: 14px;">Utilization Status</h4>
+                <h2 style="margin: 10px 0 0 0; font-size: 24px; color: {status_color};">{status}</h2>
+            </div>
+            """, unsafe_allow_html=True)
 
 # Section 2: Executive KPI Cards Grid
 st.markdown("---")
@@ -423,9 +476,19 @@ show_ai_investigator_ui(filtered_df)
 st.markdown("---")
 st.subheader("📋 Automated Operations Executive Review Compiler")
 
+col_comp1, col_comp2 = st.columns(2)
+with col_comp1:
+    if st.button("🌐 Compile Executive HTML Report", key="compile_html_btn", use_container_width=True):
+        html_path = AutomatedReportGenerator.compile_executive_html(filtered_df, selected_agent, team_utilization_df)
+        if html_path and os.path.exists(html_path):
+            st.session_state["generated_html_path"] = html_path
+            st.success(f"HTML review generated: `{html_path}`")
+        else:
+            st.error("HTML Report compilation failed or returned empty scope.")
+
 if st.button("📥 Generate Rich Executive Reports"):
     with st.spinner("Analyzing operational footprints and generating AI remarks..."):
-        report_data = AutomatedReportGenerator.generate_rich_executive_report(filtered_df, selected_agent)
+        report_data = AutomatedReportGenerator.generate_rich_executive_report(filtered_df, selected_agent, team_utilization_df)
         st.session_state["executive_report_data"] = report_data
 
 if "executive_report_data" in st.session_state:

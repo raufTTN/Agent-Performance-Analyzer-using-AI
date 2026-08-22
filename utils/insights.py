@@ -7,7 +7,7 @@ from analytics.scoring import OperationsLeaderboardScorer
 
 class AutomatedReportGenerator:
     @staticmethod
-    def generate_rich_executive_report(df: pd.DataFrame, selected_agent: str = "All Agents") -> dict:
+    def generate_rich_executive_report(df: pd.DataFrame, selected_agent: str = "All Agents", team_util_df: pd.DataFrame = None) -> dict:
         if df.empty:
             return {"error": "Execution skipped: Database scope currently empty."}
 
@@ -78,11 +78,14 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                     ai_remarks = json.loads(res.json().get('response', '{}'))
             except Exception:
                 pass
+        
+        date_range_str = datetime.now().strftime('%Y-%m-%d')
                 
-        # 5. Build HTML Report (CSS Grid & Print Styles)
+        # 5. Build HTML Content
         html_content = AutomatedReportGenerator._build_html(
-            total_tickets, compliance, total_breaches, avg_resolution, total_effort, total_sr, total_incidents,
-            agent_rankings, ai_remarks, company_dist, priority_dist, type_dist, selected_agent
+            total_tickets, compliance, total_breaches, avg_resolution, total_effort,
+            total_sr, total_incidents, agent_rankings, ai_remarks,
+            company_dist, priority_dist, type_dist, selected_agent, date_range_str, team_util_df
         )
         
         # 6. PDF Generation Fallback
@@ -105,7 +108,7 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
         }
 
     @staticmethod
-    def _build_html(total, compliance, breaches, avg_res, total_effort, total_sr, total_incidents, agent_rankings, remarks, c_dist, p_dist, t_dist, scope):
+    def _build_html(total, compliance, breaches, avg_res, total_effort, total_sr, total_incidents, agent_rankings, remarks, c_dist, p_dist, t_dist, scope, date_range, team_util_df):
         now_str = datetime.now().strftime('%d %b %Y, %H:%M')
         
         # Generate rows for agent table
@@ -130,8 +133,35 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
             """
             
         def dict_to_html_list(d):
-            if not d: return "<li>No data available</li>"
-            return "".join([f"<li><strong>{k}:</strong> {v}</li>" for k,v in list(d.items())[:5]])
+            if not d:
+                return "<li>No data available</li>"
+            return "".join([f"<li><strong>{k}:</strong> {v}</li>" for k, v in list(d.items())[:5]])
+            
+        agent_util_html = ""
+        if scope != "All Agents" and team_util_df is not None and not team_util_df.empty:
+            agent_row = team_util_df[team_util_df['agent'] == scope]
+            if not agent_row.empty:
+                r_data = agent_row.iloc[0]
+                status = r_data['Utilization_Status']
+                effort_mins = int(r_data['Total_Effort_Mins'])
+                hrs, mins = divmod(effort_mins, 60)
+                effort_str = f"{hrs}h {mins}m"
+                tickets = int(r_data['Total_Tickets'])
+                
+                status_color = "#10b981" if status == "Optimally Utilized" else "#ef4444" if status == "Overutilized" else "#f59e0b"
+                
+                agent_util_html = f"""
+                <div class="card" style="margin-bottom: 20px; background-color: #f8fafc; border-left: 4px solid {status_color};">
+                    <div class="section-title">Agent Utilization Summary</div>
+                    <table style="width: 100%; font-size: 14px; border: none;">
+                        <tr style="background: none;">
+                            <td style="border: none; padding: 5px;"><strong>Total Effort Logged:</strong> {effort_str}</td>
+                            <td style="border: none; padding: 5px;"><strong>Total Tickets Handled:</strong> {tickets}</td>
+                            <td style="border: none; padding: 5px;"><strong>Capacity Status:</strong> <span style="color: {status_color}; font-weight: bold;">{status}</span></td>
+                        </tr>
+                    </table>
+                </div>
+                """
 
         return f"""
         <!DOCTYPE html>
@@ -296,7 +326,9 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                 </tr>
             </table>
             
-            <div class="card">
+            {agent_util_html}
+            
+            <div class="card" style="margin-bottom: 20px;">
                 <div class="section-title">Engineering Scorecard & AI Remarks</div>
                 <table class="data-table">
                     <thead>
