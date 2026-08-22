@@ -71,10 +71,43 @@ else
     echo -e "${GREEN}✓ Docker and Docker Compose environments verified.${NC}"
 fi
 
+# 2.5 Ensure Docker Daemon is Running
+echo -e "\n${BLUE}⚙️  Verifying Docker Daemon Status...${NC}"
+if ! docker info &> /dev/null && ! sudo docker info &> /dev/null; then
+    echo -e "${YELLOW}⚠️  Docker daemon is not running. Attempting to start it...${NC}"
+    if [[ "$OS_TYPE" == "linux" ]]; then
+        sudo systemctl start docker || sudo service docker start || true
+        sudo systemctl enable docker &> /dev/null || true
+    elif [[ "$OS_TYPE" == "darwin" ]]; then
+        open -a Docker
+    fi
+    
+    echo -e "${YELLOW}⏳ Waiting for Docker socket to become fully available...${NC}"
+    max_retries=15
+    count=0
+    while ! docker info > /dev/null 2>&1 && ! sudo docker info > /dev/null 2>&1; do
+        sleep 2
+        echo -n "."
+        count=$((count+1))
+        if [ $count -ge $max_retries ]; then
+            echo -e "\n${RED}❌ Error: Docker daemon failed to start after 30 seconds.${NC}"
+            echo -e "${RED}Please start the Docker service manually and run this script again.${NC}"
+            exit 1
+        fi
+    done
+    echo -e "\n${GREEN}✓ Docker daemon is actively running.${NC}"
+else
+    echo -e "${GREEN}✓ Docker daemon is actively running.${NC}"
+fi
+
 # Determine the correct docker commands (handling sudo if the user is not in the docker group yet)
 if docker info &> /dev/null; then
     DOCKER_CMD="docker"
 else
+    echo -e "${YELLOW}⚠️  Permission denied on Docker socket. Gracefully falling back to sudo...${NC}"
+    if [ "$EUID" -ne 0 ] && [[ "$OS_TYPE" == "linux" ]]; then
+        echo -e "${YELLOW}🔧 (Optional) Run 'sudo usermod -aG docker \$USER' and restart your terminal to avoid sudo.${NC}"
+    fi
     DOCKER_CMD="sudo docker"
 fi
 
@@ -120,17 +153,34 @@ mkdir -p data reports exports
 echo -e "\n${BLUE}🐳 Building and starting Docker container with multi-stage image...${NC}"
 $COMPOSE_CMD up -d --build
 
-echo -e "\n${BLUE}⏳ Waiting for Streamlit application to initialize...${NC}"
-sleep 5
+echo -e "\n${BLUE}⏳ Waiting for Streamlit application to initialize on port 8501...${NC}"
+
+# Verification loop for the Streamlit port
+max_retries=15
+count=0
+APP_READY=false
+while [ $count -lt $max_retries ]; do
+    # Check if the Streamlit health endpoint or main page returns a 200 OK
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8501/_stcore/health || curl -s -o /dev/null -w "%{http_code}" http://localhost:8501 || echo "000")
+    if [ "$HTTP_STATUS" == "200" ] || [ "$HTTP_STATUS" == "302" ]; then
+        APP_READY=true
+        break
+    fi
+    sleep 2
+    echo -n "."
+    count=$((count+1))
+done
+echo ""
 
 # 7. Success Verification & Output
-if $DOCKER_CMD ps | grep -q "sre-platform"; then
+if [ "$APP_READY" = true ] && $DOCKER_CMD ps | grep -q "sre-platform"; then
     echo -e "\n${GREEN}======================================================================${NC}"
-    echo -e "${GREEN}${BOLD}🚀 Success! The SRE Platform is now LIVE and running in Docker.${NC}"
+    echo -e "${GREEN}${BOLD}🚀 Success! The SRE Platform is now LIVE and running perfectly in Docker.${NC}"
     echo -e "${GREEN}======================================================================${NC}\n"
     echo -e "You can securely access the application at: ${BLUE}${BOLD}http://localhost:8501${NC}"
     echo -e "\nTo view realtime logs, run: ${YELLOW}$COMPOSE_CMD logs -f${NC}"
     echo -e "To stop the application gracefully, run: ${YELLOW}$COMPOSE_CMD down${NC}\n"
 else
-    echo -e "\n${RED}❌ Error: Container failed to start. Please check the logs via: $COMPOSE_CMD logs${NC}"
+    echo -e "\n${RED}❌ Error: Container failed to start properly or port 8501 is unresponsive.${NC}"
+    echo -e "${RED}Please check the logs via: ${YELLOW}$COMPOSE_CMD logs${NC}"
 fi

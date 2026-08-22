@@ -1,7 +1,7 @@
 # ==============================================================================
 # Stage 1: Builder
 # ==============================================================================
-FROM python:3.11-slim AS builder
+FROM python:3.11-slim-bookworm AS builder
 
 # Prevent Python from writing pyc files and enable unbuffered logging
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -21,7 +21,7 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /build/wheels -r requirements
 # ==============================================================================
 # Stage 2: Production Runner
 # ==============================================================================
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 # Security and Optimization ENV vars
 ENV PYTHONDONTWRITEBYTECODE=1
