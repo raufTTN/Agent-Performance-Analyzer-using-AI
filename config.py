@@ -15,7 +15,7 @@ DB_PATH = str(DATA_DIR / "analyzer.db")
 # CSV_PATH = str(DATA_DIR / "tickets.csv")
 
 # Local AI Engine Controls via Ollama
-OLLAMA_API_URL = "http://localhost:11434/api/generate"
+OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434/api/generate")
 OLLAMA_MODEL = "qwen2.5:3b"
 LLM_TIMEOUT = 180
 MAX_TEXT_WINDOW = 1500

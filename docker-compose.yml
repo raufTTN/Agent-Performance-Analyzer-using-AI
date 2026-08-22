@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  sre-platform:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sre-platform
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+      - ./exports:/app/exports
+    environment:
+      # Use host.docker.internal to allow the container to access Ollama on the host machine
+      - OLLAMA_API_URL=http://host.docker.internal:11434/api/generate
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
