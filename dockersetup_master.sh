@@ -149,8 +149,17 @@ fi
 echo -e "\n${BLUE}📁 Verifying data and export directories...${NC}"
 mkdir -p data reports exports
 
+# 5.5 Ensure host port 8501 is free
+echo -e "\n${BLUE}🔌 Ensuring host port 8501 is available...${NC}"
+if command -v lsof &> /dev/null; then
+    sudo lsof -ti tcp:8501 | xargs sudo kill -9 &> /dev/null || true
+elif command -v fuser &> /dev/null; then
+    sudo fuser -k 8501/tcp &> /dev/null || true
+fi
+
 # 6. Build and Run Container
-echo -e "\n${BLUE}🐳 Building and starting Docker container with multi-stage image...${NC}"
+echo -e "\n${BLUE}🐳 Cleaning up old containers and starting Docker deployment...${NC}"
+$COMPOSE_CMD down --remove-orphans || true
 $COMPOSE_CMD up -d --build
 
 echo -e "\n${BLUE}⏳ Waiting for Streamlit application to initialize on port 8501...${NC}"
