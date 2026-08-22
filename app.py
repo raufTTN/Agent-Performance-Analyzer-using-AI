@@ -1,4 +1,5 @@
 import os
+
 # pyrefly: ignore [missing-import]
 import streamlit as st
 import pandas as pd
@@ -16,6 +17,7 @@ from analytics.insights import LocalAgentCoachingEngine
 from analytics.ticket_explorer import show_ai_investigator_ui
 from utils.insights import AutomatedReportGenerator
 from analytics.root_cause import SystemicRootCauseEngine
+from analytics.performance import ComprehensivePerformanceEngine
 
 # Initialize local database schema tables setup handshake protocol immediately
 initialize_database()
@@ -48,7 +50,7 @@ st.markdown(
     }
     </style>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 
@@ -63,7 +65,9 @@ def run_system_sync_sequence(csv_path):
 st.sidebar.header("🎛️ Operations Control Panel")
 
 # Discover CSV datasets dynamically from DATA_DIR
-csv_files = sorted([f.name for f in DATA_DIR.glob("*.csv")]) if DATA_DIR.exists() else []
+csv_files = (
+    sorted([f.name for f in DATA_DIR.glob("*.csv")]) if DATA_DIR.exists() else []
+)
 
 if not csv_files:
     st.sidebar.warning("No CSV files found in the data directory.")
@@ -74,7 +78,9 @@ else:
     if "tickets.csv" in csv_files:
         default_idx = csv_files.index("tickets.csv")
 
-    selected_csv = st.sidebar.selectbox("📂 Select CSV Dataset", csv_files, index=default_idx)
+    selected_csv = st.sidebar.selectbox(
+        "📂 Select CSV Dataset", csv_files, index=default_idx
+    )
     selected_csv_path = DATA_DIR / selected_csv
     st.session_state["selected_csv"] = str(selected_csv_path)
 
@@ -168,7 +174,7 @@ selected_effort_exclusion = st.sidebar.multiselect(
 # --- EXECUTE MULTI-FILTER ROUTING PARSING ---
 filtered_df = df_filtered_base.copy()
 
-# Apply Date Range filter   
+# Apply Date Range filter
 if isinstance(selected_date_range, tuple) and len(selected_date_range) == 2:
     start_date, end_date = selected_date_range
     filtered_df = filtered_df[
@@ -229,7 +235,10 @@ rankings_df = OperationsLeaderboardScorer.compile_weighted_rankings(
 
 # --- MAIN RENDER FRAME UI ---
 st.title("🛡️ Enterprise SRE & IT Operations Intelligence Platform")
-st.markdown("<small style='color: #38bdf8; font-weight: 600;'>Developed by Team Gamma (US SRE Pod)</small>", unsafe_allow_html=True)
+st.markdown(
+    "<small style='color: #38bdf8; font-weight: 600;'>Developed by Team Gamma (US SRE Pod)</small>",
+    unsafe_allow_html=True,
+)
 st.caption(
     f"Agent Performance Analyzer Module Pipeline | Node: Air-Gapped Local | Model Active: `{OLLAMA_MODEL}`"
 )
@@ -424,27 +433,33 @@ with tab_breached:
 # Section 4: Systemic Root Cause & Security Compliance Diagnostics
 st.markdown("---")
 st.subheader("🛡️ Infrastructure Noise & Top 5 Systemic Alerts")
-st.caption("Scans high-volume repeating noise clusters to construct air-gapped security playbooks and engineering efficiency strategies.")
+st.caption(
+    "Scans high-volume repeating noise clusters to construct air-gapped security playbooks and engineering efficiency strategies."
+)
 
-if st.button("🔮 Analyze Infrastructure Noise Clusters & Security Exposure", key="root_cause_btn"):
+if st.button(
+    "🔮 Analyze Infrastructure Noise Clusters & Security Exposure", key="root_cause_btn"
+):
     with st.spinner(
         "Extracting pattern matrices and driving local inference weights..."
     ):
         rc_engine = SystemicRootCauseEngine()
         strategic_review = rc_engine.cluster_and_analyze_patterns(filtered_df)
-        
+
         if isinstance(strategic_review, dict):
             if "error" in strategic_review:
                 st.warning(strategic_review["error"])
             else:
                 st.markdown("#### 🚨 Top 5 Noisy Alerts")
                 alerts_df = pd.DataFrame(strategic_review["top_alerts"])
-                alerts_df = alerts_df.rename(columns={
-                    "Target Company Context": "Company Name",
-                    "Total Occurrence Count": "Frequency Count"
-                })
+                alerts_df = alerts_df.rename(
+                    columns={
+                        "Target Company Context": "Company Name",
+                        "Total Occurrence Count": "Frequency Count",
+                    }
+                )
                 st.dataframe(alerts_df, use_container_width=True, hide_index=True)
-                
+
                 st.markdown("#### 🧠 AI Security & Efficiency Impact Summary")
                 with st.expander("View Strategic Insights", expanded=True):
                     st.info(strategic_review["insights"])
@@ -506,20 +521,30 @@ show_ai_investigator_ui(filtered_df)
 # Section 9: Automated Operations Executive Review Compiler (Dual Export: HTML & PDF)
 st.markdown("---")
 st.subheader("📋 Automated Operations Executive Review Compiler")
-st.caption("Generate and download standardized executive performance reports in HTML or PDF formats.")
+st.caption(
+    "Generate and download standardized executive performance reports in HTML or PDF formats."
+)
 
 col_comp1, col_comp2 = st.columns(2)
 
 with col_comp1:
-    if st.button("🌐 Compile Executive HTML Report", key="compile_html_btn", use_container_width=True):
-        html_path = AutomatedReportGenerator.compile_executive_html(filtered_df, selected_agent)
+    if st.button(
+        "🌐 Compile Executive HTML Report",
+        key="compile_html_btn",
+        use_container_width=True,
+    ):
+        html_path = AutomatedReportGenerator.compile_executive_html(
+            filtered_df, selected_agent
+        )
         if html_path and os.path.exists(html_path):
             st.session_state["generated_html_path"] = html_path
             st.success(f"HTML review generated: `{html_path}`")
         else:
             st.error("HTML Report compilation failed or returned empty scope.")
 
-    if "generated_html_path" in st.session_state and os.path.exists(st.session_state["generated_html_path"]):
+    if "generated_html_path" in st.session_state and os.path.exists(
+        st.session_state["generated_html_path"]
+    ):
         with open(st.session_state["generated_html_path"], "r", encoding="utf-8") as f:
             html_data = f.read()
         st.download_button(
@@ -528,24 +553,40 @@ with col_comp1:
             file_name=os.path.basename(st.session_state["generated_html_path"]),
             mime="text/html",
             key="dl_html_btn",
-            use_container_width=True
+            use_container_width=True,
         )
 
 with col_comp2:
-    if st.button("📄 Compile Executive PDF Report", key="compile_pdf_btn", use_container_width=True):
+    if st.button(
+        "📄 Compile Executive PDF Report",
+        key="compile_pdf_btn",
+        use_container_width=True,
+    ):
         # Auto-compile HTML base if it doesn't exist yet in current session
-        if "generated_html_path" not in st.session_state or not os.path.exists(st.session_state["generated_html_path"]):
-            st.session_state["generated_html_path"] = AutomatedReportGenerator.compile_executive_html(filtered_df, selected_agent)
+        if "generated_html_path" not in st.session_state or not os.path.exists(
+            st.session_state["generated_html_path"]
+        ):
+            st.session_state["generated_html_path"] = (
+                AutomatedReportGenerator.compile_executive_html(
+                    filtered_df, selected_agent
+                )
+            )
 
         with st.spinner("Converting HTML document to PDF format..."):
-            pdf_path = AutomatedReportGenerator.compile_executive_pdf(st.session_state["generated_html_path"])
+            pdf_path = AutomatedReportGenerator.compile_executive_pdf(
+                st.session_state["generated_html_path"]
+            )
             if pdf_path and os.path.exists(pdf_path):
                 st.session_state["generated_pdf_path"] = pdf_path
                 st.success(f"PDF review generated: `{pdf_path}`")
             else:
-                st.error("Failed to compile PDF. Please verify 'wkhtmltopdf' is installed on your Linux system (`sudo apt install wkhtmltopdf`).")
+                st.error(
+                    "Failed to compile PDF. Please verify 'wkhtmltopdf' is installed on your Linux system (`sudo apt install wkhtmltopdf`)."
+                )
 
-    if "generated_pdf_path" in st.session_state and os.path.exists(st.session_state["generated_pdf_path"]):
+    if "generated_pdf_path" in st.session_state and os.path.exists(
+        st.session_state["generated_pdf_path"]
+    ):
         with open(st.session_state["generated_pdf_path"], "rb") as f:
             pdf_bytes = f.read()
         st.download_button(
@@ -554,5 +595,134 @@ with col_comp2:
             file_name=os.path.basename(st.session_state["generated_pdf_path"]),
             mime="application/pdf",
             key="dl_pdf_btn",
-            use_container_width=True
+            use_container_width=True,
         )
+# Section 7: Comprehensive Agent Performance Analysis
+st.markdown("---")
+st.subheader("📊 Comprehensive Agent Performance Analysis")
+
+st.caption(
+    "Performance is calculated using existing operational metrics "
+    "and Freshservice ticket field completion."
+)
+
+performance_df = ComprehensivePerformanceEngine.calculate_agent_metrics(filtered_df)
+
+if performance_df.empty:
+
+    st.info("No sufficient records available for performance analysis.")
+
+else:
+
+    # ---------------------------------------------------------
+    # Summary
+    # ---------------------------------------------------------
+
+    top_agent = performance_df.iloc[0]
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric(
+        "Team Average Performance",
+        f"{performance_df['Performance Score'].mean():.1f}%",
+    )
+
+    c2.metric(
+        "Top Performer",
+        top_agent["Agent"],
+    )
+
+    c3.metric(
+        "Top Performance Score",
+        f"{top_agent['Performance Score']:.1f}%",
+    )
+
+    # ---------------------------------------------------------
+    # Performance Leaderboard
+    # ---------------------------------------------------------
+
+    st.markdown("### 🏆 Performance Leaderboard")
+
+    st.dataframe(
+        performance_df,
+        width="stretch",
+        hide_index=True,
+    )
+
+    # ---------------------------------------------------------
+    # Agent Details
+    # ---------------------------------------------------------
+
+    st.markdown("### 🔎 Agent Performance Details")
+
+    selected_agent = st.selectbox(
+        "Select Engineer:",
+        performance_df["Agent"].tolist(),
+        key="performance_analysis_agent",
+    )
+
+    agent = performance_df[performance_df["Agent"] == selected_agent].iloc[0]
+
+    d1, d2, d3 = st.columns(3)
+
+    d1.metric(
+        "Overall Score",
+        f"{agent['Performance Score']:.1f}%",
+    )
+
+    d2.metric(
+        "Grade",
+        agent["Performance Grade"],
+    )
+
+    d3.metric(
+        "Tickets Handled",
+        int(agent["Tickets Handled"]),
+    )
+
+    # ---------------------------------------------------------
+    # Complete Performance Breakdown
+    # ---------------------------------------------------------
+
+    metric_data = pd.DataFrame(
+        {
+            "Metric": [
+                "Ticket Volume",
+                "SLA Compliance",
+                "Resolution Time",
+                "Effort",
+                "Priority Handling",
+                "SR/Incident Classification",
+                "Affected CI",
+                "Other Affected CI",
+                "Issue Bucket",
+                "Resolution Applied",
+                "Resolution Note",
+                "Escalation",
+                "Category",
+                "Sub-category",
+            ],
+            "Score": [
+                agent["Ticket Volume"],
+                agent["SLA Compliance"],
+                agent["Resolution Time"],
+                agent["Effort"],
+                agent["Priority Handling"],
+                agent["SR/Incident Classification"],
+                agent["Affected CI"],
+                agent["Other Affected CI"],
+                agent["Issue Bucket"],
+                agent["Resolution Applied"],
+                agent["Resolution Note"],
+                agent["Escalation"],
+                agent["Category"],
+                agent["Sub-category"],
+            ],
+        }
+    )
+
+    st.dataframe(
+        metric_data,
+        width="stretch",
+        hide_index=True,
+    )
