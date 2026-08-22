@@ -9,9 +9,7 @@ __pycache__/
 data/*.db
 data/*.csv
 reports/*.html
-
+reports/*.pdf
 # Streamlit Local Configurations & Cache
 .streamlit/
 EOF
-
-echo "reports/*.pdf"
