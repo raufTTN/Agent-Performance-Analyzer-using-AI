@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: analyzer_ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - analyzer_net
+
+  analyzer-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent_performance_analyzer
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      - OLLAMA_API_URL=http://ollama:11434/api/generate
+      - OLLAMA_MODEL=qwen2.5:3b
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+    depends_on:
+      - ollama
+    networks:
+      - analyzer_net
+
+volumes:
+  ollama_models:
+    name: analyzer_ollama_models
+
+networks:
+  analyzer_net:
+    driver: bridge

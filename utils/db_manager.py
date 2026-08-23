@@ -2,18 +2,17 @@ import sqlite3
 from config import DB_PATH
 
 def get_db_connection():
-    """Establishes thread-safe client connection context to local database."""
+    """Returns a thread-safe cursor connection wrapper instance."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 def initialize_database():
-    """Initializes primary tables and index maps inside storage architecture."""
+    """Deploys schema structures locally inside SQLite."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
-        # Primary Relational Tickets Storage Table Structure
-        # Included company, ticket_type, category, and sub_category
+        # Primary Relational Tickets Model Table with full Freshservice fields
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS tickets (
                 ticket_id TEXT PRIMARY KEY,
@@ -22,10 +21,14 @@ def initialize_database():
                 subject TEXT,
                 description TEXT,
                 priority TEXT,
+                urgency TEXT,
+                ticket_group TEXT,
                 company TEXT,
                 ticket_type TEXT,
                 category TEXT,
-                sub_category TEXT,
+                alarm_source TEXT,
+                affected_ci TEXT,
+                issue_bucket TEXT,
                 agent TEXT,
                 resolution_applied TEXT,
                 resolution_note TEXT,
@@ -37,14 +40,10 @@ def initialize_database():
             )
         """)
         
-        # Performance indexes for heavy data grouping runs
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_tickets_agent ON tickets(agent);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tickets_company ON tickets(company);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tickets_type ON tickets(ticket_type);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tickets_category ON tickets(category);")
         conn.commit()
 
 if __name__ == "__main__":
     initialize_database()
-    print("✅ Local SQLite database layer operational with Company, Type, and Category tracking.")
+    print("✅ Database Initialization Complete.")

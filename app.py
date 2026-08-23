@@ -16,6 +16,7 @@ from analytics.insights import LocalAgentCoachingEngine
 from analytics.ticket_explorer import show_ai_investigator_ui
 from utils.insights import AutomatedReportGenerator
 from analytics.root_cause import SystemicRootCauseEngine
+from analytics.validator import FreshserviceFieldValidator
 
 # Initialize local database schema tables setup handshake protocol immediately
 initialize_database()
@@ -105,7 +106,6 @@ df_master["month_year_str"] = df_master["created_dt"].dt.strftime("%B %Y")
 df_master["month_sort_key"] = df_master["created_dt"].dt.to_period("M")
 
 # --- 1. EXCLUDE AUTO-RESOLVED TICKETS NATIVELY ---
-# Filtering out system automated closures to prevent skewed metrics
 system_automation_identifiers = ["Auto-Resolve", "System Agent", "bot", "auto_resolver"]
 df_filtered_base = df_master[
     ~df_master["agent"]
@@ -138,7 +138,7 @@ selected_date_range = st.sidebar.date_input(
 # Company Selector
 company_column = (
     "company" if "company" in df_filtered_base.columns else "status"
-)  # fallback if not fully migrated
+)
 companies = ["All Companies"] + sorted(
     df_filtered_base[company_column].dropna().unique().tolist()
 )
@@ -184,21 +184,18 @@ if selected_company != "All Companies":
 if selected_type != "All Types (SR & Incident)":
     is_sr = pd.Series(False, index=filtered_df.index)
 
-    # 1. Dynamically search ANY column that might hold Type/Category data
     for col in filtered_df.columns:
         if col.lower().strip() in ["category", "type", "ticket_type", "ticket type"]:
             is_sr = is_sr | filtered_df[col].astype(str).str.contains(
                 r"(?i)(service request|\bsr\b)", na=False
             )
 
-    # 2. Force-check the Subject line to catch automated access requests that lack a Category tag
     if "subject" in filtered_df.columns:
         sr_keywords = r"(?i)(service request|\bsr\b|grant is awaiting|approve or deny|grant access|access request)"
         is_sr = is_sr | filtered_df["subject"].astype(str).str.contains(
             sr_keywords, na=False
         )
 
-    # 3. Final Routing Execution
     if selected_type == "SR (Service Request)":
         filtered_df = filtered_df[is_sr]
     elif selected_type == "Incident":
@@ -234,11 +231,10 @@ st.caption(
     f"Agent Performance Analyzer Module Pipeline | Node: Air-Gapped Local | Model Active: `{OLLAMA_MODEL}`"
 )
 
-# --- REFINEMENT WORKSPACE: MONTH-WISE HISTORICAL CHAMPIONS TRACKER ---
+# --- SECTION: MONTH-WISE HISTORICAL CHAMPIONS TRACKER ---
 st.markdown("---")
 st.subheader("📅 Chronological Month-Wise Operational Performers")
 
-# Extract unique months present in the filtered base set sorted chronologically
 available_months = df_filtered_base.dropna(subset=["month_sort_key"]).sort_values(
     by="month_sort_key"
 )
@@ -303,7 +299,7 @@ else:
         else:
             st.caption("No metrics calculated for this period segment.")
 
-# Section 1: Scoped Insights & Accolades Highlight Panel (Global filtered context)
+# Section 1: Scoped Insights & Accolades Highlight Panel
 st.markdown("---")
 h1, h2 = st.columns(2)
 
@@ -322,36 +318,54 @@ with h1:
 with h2:
     st.markdown("### ⚡ Scoped Fastest Ticket Resolver")
     if not rankings_df.empty:
-        valid_resolvers = rankings_df[rankings_df["Tickets_Handled"] >= 5]
+        # Filter for valid non-zero resolution times (> 0.05 hrs / 3 mins) to avoid 0.0 artifacts
+        valid_resolvers = rankings_df[
+            (rankings_df["Tickets_Handled"] >= 3) & 
+            (rankings_df["Avg_Resolution_Hours"] > 0.05)
+        ]
+        if valid_resolvers.empty:
+            valid_resolvers = rankings_df[rankings_df["Avg_Resolution_Hours"] > 0]
         if valid_resolvers.empty:
             valid_resolvers = rankings_df
+
         fastest_agent = valid_resolvers.sort_values(
             by="Avg_Resolution_Hours", ascending=True
         ).iloc[0]
+        
+        fast_hrs = float(fastest_agent['Avg_Resolution_Hours'])
+        fast_mins = int(fast_hrs * 60)
+        speed_display = f"{fast_hrs:.2f} Hours ({fast_mins} Mins)" if fast_hrs < 1.0 else f"{fast_hrs:.1f} Hours"
+
         st.info(
-            f"**{fastest_agent['agent']}** leading response operations with a handling speed averaging **{fastest_agent['Avg_Resolution_Hours']} Hours** per ticket."
+            f"**{fastest_agent['agent']}** leading response operations with a handling speed averaging **{speed_display}** per ticket."
         )
     else:
         st.caption(
             "Insufficient execution duration footprints mapped to extract speed parameters."
         )
 
-# Section 2: Executive KPI Cards Grid
+# Section 2: Executive KPI & Pod Time Utilization Cards Grid
 st.markdown("---")
 sla_metrics = CoreSLADiagnosticEngine.fetch_sla_summary(filtered_df)
-avg_effort = (
-    filtered_df["effort_mins"].mean() if "effort_mins" in filtered_df.columns else 0
-)
+
+total_effort_hrs = round((filtered_df["effort_mins"].sum() / 60.0), 1) if "effort_mins" in filtered_df.columns else 0.0
+
+if "created_dt" in filtered_df.columns and not filtered_df["created_dt"].dropna().empty:
+    weeks_count = filtered_df["created_dt"].dt.to_period("W").nunique() or 1
+    months_count = filtered_df["created_dt"].dt.to_period("M").nunique() or 1
+    weekly_effort_hrs = round(total_effort_hrs / weeks_count, 1)
+    monthly_effort_hrs = round(total_effort_hrs / months_count, 1)
+else:
+    weekly_effort_hrs = 0.0
+    monthly_effort_hrs = 0.0
+
 if selected_type == "All Types (SR & Incident)":
     avg_res_hours = None
 else:
-    avg_res_hours = (
-        filtered_df["resolution_hours"].mean()
-        if "resolution_hours" in filtered_df.columns
-        else None
-    )
+    avg_res_hours = filtered_df["resolution_hours"].mean() if "resolution_hours" in filtered_df.columns else None
 
-c1, c2, c3, c4 = st.columns(4)
+# Row 1: Executive Volumes
+c1, c2, c3 = st.columns(3)
 c1.metric("Total Tickets", f"{len(filtered_df):,}")
 c2.metric("SLA Compliance Rate Percentage", f"{sla_metrics['compliance_pct']}%")
 c3.metric(
@@ -359,11 +373,41 @@ c3.metric(
     f"{sla_metrics['breach_count']} Failed",
     delta_color="inverse",
 )
+
+# Row 2: Pod Time Utilization
+u1, u2, u3, u4 = st.columns(4)
+u1.metric("Pod Total Effort (US SRE)", f"{total_effort_hrs} Hrs")
+u2.metric("Weekly Effort Rate", f"{weekly_effort_hrs} Hrs/Wk")
+u3.metric("Monthly Effort Capacity", f"{monthly_effort_hrs} Hrs/Mo")
 if avg_res_hours is not None and not pd.isna(avg_res_hours):
-    c4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
+    u4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
+else:
+    u4.metric("Avg Effort Per Ticket", f"{round(filtered_df['effort_mins'].mean(), 0) if 'effort_mins' in filtered_df.columns else 0} Mins")
 
 
-# Section 3: SLA Compliance Target Ticket Data Grid
+# Section 3: Individual Engineer Time Utilization (US SRE Pod)
+st.markdown("---")
+st.subheader("⏱️ Individual Engineer Time Utilization (US SRE Pod)")
+st.caption("Calculates individual engineer workload in hours: Total Time, Weekly Rate (Hrs/Wk), Monthly Capacity (Hrs/Mo), and Project Allocations.")
+
+pod_util_df = AutomatedReportGenerator.calculate_individual_pod_utilization(filtered_df)
+
+if not pod_util_df.empty:
+    display_util = pod_util_df.rename(columns={
+        "agent": "SRE Engineer",
+        "total_tickets": "Tickets Handled",
+        "total_effort_hrs": "Total Effort (Hours)",
+        "weekly_hrs": "Weekly Rate (Hrs/Wk)",
+        "monthly_hrs": "Monthly Rate (Hrs/Mo)",
+        "pod_share_pct": "Pod Workload Share (%)",
+        "top_projects": "Project / Account Allocations (Hours)"
+    })
+    st.dataframe(display_util, use_container_width=True, hide_index=True)
+else:
+    st.caption("No individual pod utilization records available in current scope.")
+
+
+# Section 4: SLA Compliance Target Ticket Data Grid
 st.markdown("---")
 st.subheader("📋 SLA Inception Status Tracking Tables")
 
@@ -386,7 +430,6 @@ rename_map = {
     "status": "State Status",
 }
 
-# Ensure all target display columns exist before filtering dataframe
 available_columns = [col for col in columns_to_show if col in filtered_df.columns]
 
 breached_records = filtered_df[filtered_df["sla_breached"] == 1][
@@ -421,7 +464,82 @@ with tab_breached:
         )
 
 
-# Section 4: Systemic Root Cause & Security Compliance Diagnostics
+# Section 5: Freshservice Field Validation & Form Hygiene Hub
+st.markdown("---")
+st.subheader("📋 Freshservice Field Validation & Form Hygiene Hub")
+st.caption("Audits mandatory field completeness (Group, Priority, Status, Company, Category, Type) across tickets and engineers.")
+
+audited_df = FreshserviceFieldValidator.batch_audit_dataframe(filtered_df)
+
+tab_agent_hygiene, tab_ticket_hygiene = st.tabs([
+    "👤 Agent-Wise Field Hygiene Scorecard",
+    "🎟️ Ticket-Wise Field Validation Inspector"
+])
+
+# 1. Agent-Wise Hygiene Scorecard Tab
+with tab_agent_hygiene:
+    agent_hygiene_df = FreshserviceFieldValidator.generate_agent_scorecard(audited_df)
+    if not agent_hygiene_df.empty:
+        display_agent_hygiene = agent_hygiene_df.rename(columns={
+            "agent": "Assigned SRE / Agent",
+            "Total_Tickets": "Total Tickets Handled",
+            "Compliant_Forms": "100% Perfect Forms",
+            "Missing_Field_Tickets": "Tickets With Missing Fields",
+            "Compliance_Rate": "Form Compliance Rate (%)",
+            "Avg_Form_Quality_Score": "Average Hygiene Score (%)"
+        })
+        st.dataframe(display_agent_hygiene, use_container_width=True, hide_index=True)
+    else:
+        st.caption("No agent form records found in the current operational scope.")
+
+# 2. Ticket-Wise Validation Inspector Tab
+with tab_ticket_hygiene:
+    flagged_tickets = audited_df[audited_df["field_compliant"] == 0]
+    perfect_tickets = audited_df[audited_df["field_compliant"] == 1]
+
+    subtab_flagged, subtab_perfect = st.tabs([
+        f"🚨 Flagged / Missing Fields ({len(flagged_tickets):,})",
+        f"✅ 100% Compliant Tickets ({len(perfect_tickets):,})"
+    ])
+
+    cols_to_inspect = [
+        "ticket_id", "subject", "agent", "company", "ticket_type",
+        "missing_fields_list", "form_quality_score"
+    ]
+    rename_inspect = {
+        "ticket_id": "Ticket ID",
+        "subject": "Case Subject",
+        "agent": "Assigned SRE",
+        "company": "Company",
+        "ticket_type": "Type",
+        "missing_fields_list": "Missing Mandatory Fields",
+        "form_quality_score": "Score (%)"
+    }
+
+    avail_inspect_cols = [c for c in cols_to_inspect if c in audited_df.columns]
+
+    with subtab_flagged:
+        if not flagged_tickets.empty:
+            st.dataframe(
+                flagged_tickets[avail_inspect_cols].rename(columns=rename_inspect),
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.success("🎉 Operational perfection! All tickets within the active scope meet full field validation standards.")
+
+    with subtab_perfect:
+        if not perfect_tickets.empty:
+            st.dataframe(
+                perfect_tickets[avail_inspect_cols].rename(columns=rename_inspect),
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.caption("No fully compliant tickets available in this view scope.")
+
+
+# Section 6: Systemic Root Cause & Security Compliance Diagnostics
 st.markdown("---")
 st.subheader("🛡️ Infrastructure Noise & Top 5 Systemic Alerts")
 st.caption("Scans high-volume repeating noise clusters to construct air-gapped security playbooks and engineering efficiency strategies.")
@@ -452,7 +570,7 @@ if st.button("🔮 Analyze Infrastructure Noise Clusters & Security Exposure", k
             st.info(strategic_review)
 
 
-# Section 5: Interactive Plotly Chart Columns Block
+# Section 7: Interactive Plotly Chart Columns Block
 st.markdown("---")
 st.subheader("📈 Workflow Diagnostics & Workload Aggregations")
 g1, g2 = st.columns(2)
@@ -472,7 +590,7 @@ with g2:
         st.caption("No workload allocation metrics mapped.")
 
 
-# Section 6: Engineering Scorecard Performance Leaderboard
+# Section 8: Engineering Scorecard Performance Leaderboard
 st.markdown("---")
 st.subheader("🏆 Performance Score Leaderboard System Matrix")
 if not rankings_df.empty:
@@ -482,7 +600,7 @@ else:
         "Insufficient active records available to calculate team metrics ranking values."
     )
 
-# Section 7: Local AI Agent Career Coaching Workshop
+# Section 9: Local AI Agent Career Coaching Workshop
 st.markdown("---")
 st.subheader("🧠 Air-Gapped Local AI Agent Career Coaching Workshop")
 coach_target = st.selectbox(
@@ -500,10 +618,10 @@ if st.button("🔮 Construct AI Coaching Assessment Profile", key="coaching_btn"
         )
         st.info(coach.build_agent_coaching_matrix(coach_target, agent_set))
 
-# Section 8: Deep Forensic Ticket Investigation Module Injection Anchor
+# Section 10: Deep Forensic Ticket Investigation Module Injection Anchor
 show_ai_investigator_ui(filtered_df)
 
-# Section 9: Automated Operations Executive Review Compiler (Dual Export: HTML & PDF)
+# Section 11: Automated Operations Executive Review Compiler (Dual Export: HTML & PDF)
 st.markdown("---")
 st.subheader("📋 Automated Operations Executive Review Compiler")
 st.caption("Generate and download standardized executive performance reports in HTML or PDF formats.")
@@ -533,7 +651,6 @@ with col_comp1:
 
 with col_comp2:
     if st.button("📄 Compile Executive PDF Report", key="compile_pdf_btn", use_container_width=True):
-        # Auto-compile HTML base if it doesn't exist yet in current session
         if "generated_html_path" not in st.session_state or not os.path.exists(st.session_state["generated_html_path"]):
             st.session_state["generated_html_path"] = AutomatedReportGenerator.compile_executive_html(filtered_df, selected_agent)
 
