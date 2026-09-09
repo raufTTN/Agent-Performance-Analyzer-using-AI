@@ -18,6 +18,7 @@ from utils.insights import AutomatedReportGenerator
 from analytics.root_cause import SystemicRootCauseEngine
 from analytics.capacity import AgentCapacityProfiler
 from analytics.hygiene import FieldValidationAuditor
+from analytics.reports import ExcelReportsGenerator
 
 # Initialize local database schema tables setup handshake protocol immediately
 initialize_database()
@@ -225,6 +226,9 @@ selected_effort_exclusion = st.sidebar.multiselect(
 
 st.sidebar.markdown("---")
 exclude_merge = st.sidebar.checkbox("🚫 Exclude Merged Tickets", value=False, help="Filters out tickets where the Issue Bucket indicates they were merged.")
+
+st.sidebar.markdown("---")
+standard_working_days = st.sidebar.slider("Standard Working Days in Period", min_value=1.0, max_value=31.0, value=20.0, step=0.5, help="Used for calculating Total Agent Utilization %")
 
 # --- EXECUTE MULTI-FILTER ROUTING PARSING ---
 filtered_df = df_filtered_base.copy()
@@ -720,6 +724,85 @@ with tab_ticket:
             st.dataframe(compliant_tickets, use_container_width=True, hide_index=True)
         else:
             st.caption("No perfectly compliant tickets found.")
+
+# Section 7.5: Advanced Excel-Style Utilization Reports
+st.markdown("---")
+st.subheader("📊 Detailed Operations & Utilization Reports")
+st.caption("Native spreadsheet-style data aggregations pulled directly from the local database.")
+
+tab_top_accounts, tab_working_stats, tab_agent_pivot, tab_agent_util, tab_client_count = st.tabs([
+    "🏢 Top Accounts",
+    "⏱️ Agent Working Stats",
+    "📈 Agent Pivot Table",
+    "⚡ Agent Utilization %",
+    "🎫 Client Ticket Count"
+])
+
+with tab_top_accounts:
+    top_accounts_df = ExcelReportsGenerator.generate_top_accounts_report(filtered_df, standard_working_days)
+    if not top_accounts_df.empty:
+        # Style Utilization with % sign
+        styled_top_accounts = top_accounts_df.style.format({'L1 Team Utilization per Account': '{:.2f}%'})
+        st.dataframe(styled_top_accounts, use_container_width=True, hide_index=True)
+    else:
+        st.caption("No account data available.")
+
+with tab_working_stats:
+    working_stats_df = ExcelReportsGenerator.generate_agent_working_stats(filtered_df)
+    if not working_stats_df.empty:
+        # Style Average row bold
+        def style_avg_row(row):
+            if row['Agent Name'] == 'Average':
+                return ['font-weight: bold; background-color: rgba(255,255,255,0.05)'] * len(row)
+            return [''] * len(row)
+        styled_working_stats = working_stats_df.style.apply(style_avg_row, axis=1)
+        st.dataframe(styled_working_stats, use_container_width=True, hide_index=True)
+    else:
+        st.caption("No agent working stats available.")
+
+with tab_agent_pivot:
+    agent_pivot_df = ExcelReportsGenerator.generate_agent_pivot(filtered_df)
+    if not agent_pivot_df.empty:
+        # Style Grand Total row bold
+        def style_total_row_pivot(row):
+            if row['Agent'] == 'Grand Total':
+                return ['font-weight: bold; background-color: rgba(255,255,255,0.05)'] * len(row)
+            return [''] * len(row)
+        styled_agent_pivot = agent_pivot_df.style.apply(style_total_row_pivot, axis=1)
+        st.dataframe(styled_agent_pivot, use_container_width=True, hide_index=True)
+    else:
+        st.caption("No pivot data available.")
+
+with tab_agent_util:
+    agent_util_df = ExcelReportsGenerator.generate_agent_utilization(filtered_df, standard_working_days)
+    if not agent_util_df.empty:
+        # Style Utilization with % sign and color scale
+        styled_agent_util = agent_util_df.style.format({'Utilization %': '{:.2%}'})
+        # Add basic color highlighting for over/under utilization
+        def highlight_utilization(val):
+            try:
+                # Value is already a decimal (e.g. 0.4453 for 44.53%)
+                if float(val) > 1.0: return 'color: #EF4444' # Over 100%
+                if float(val) < 0.4: return 'color: #F59E0B' # Under 40%
+                return 'color: #10B981' # Optimal
+            except:
+                return ''
+        styled_agent_util = styled_agent_util.map(highlight_utilization, subset=['Utilization %'])
+        st.dataframe(styled_agent_util, use_container_width=True, hide_index=True)
+    else:
+        st.caption("No utilization data available.")
+
+with tab_client_count:
+    client_count_df = ExcelReportsGenerator.generate_client_ticket_count(filtered_df)
+    if not client_count_df.empty:
+        def style_total_row_client(row):
+            if row['Company'] == 'Grand Total':
+                return ['font-weight: bold; background-color: rgba(255,255,255,0.05)'] * len(row)
+            return [''] * len(row)
+        styled_client_count = client_count_df.style.apply(style_total_row_client, axis=1)
+        st.dataframe(styled_client_count, use_container_width=True, hide_index=True)
+    else:
+        st.caption("No client data available.")
 
 # Section 8: Local AI Agent Career Coaching Workshop
 st.markdown("---")
