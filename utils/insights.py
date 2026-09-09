@@ -17,11 +17,36 @@ class AutomatedReportGenerator:
 
     @staticmethod
 <<<<<<< HEAD
+<<<<<<< HEAD
     def compile_executive_html(df: pd.DataFrame, selected_agent: str = "All Agents", team_util_df: pd.DataFrame = None) -> str:
         """
         Compiles all scoped metrics, agent scorecards, and AI remarks into a standalone HTML report.
         """
 =======
+=======
+    def get_shift(dt) -> str:
+        if pd.isna(dt):
+            return "Unknown"
+        
+        try:
+            hour = dt.hour
+            minute = dt.minute
+            time_val = hour + minute / 60.0
+            
+            # Morning: 6:30 AM to 3:00 PM
+            if 6.5 <= time_val < 15.0:
+                return "Morning"
+            # Afternoon: 3:00 PM to 11:00 PM
+            elif 15.0 <= time_val < 23.0:
+                return "Afternoon"
+            # Night: 11:00 PM to 6:30 AM
+            else:
+                return "Night"
+        except:
+            return "Unknown"
+
+    @staticmethod
+>>>>>>> 9975b0b (Fixing the ticket export field issue, it will only use the relevant columns which will be required from all fields ticket dump in runtime)
     def calculate_individual_pod_utilization(df: pd.DataFrame) -> pd.DataFrame:
         if df.empty or "agent" not in df.columns:
             return pd.DataFrame()
@@ -31,6 +56,11 @@ class AutomatedReportGenerator:
             df_work["created_dt"] = pd.to_datetime(df_work["created_time"], errors="coerce")
 
         df_work["effort_hours"] = (pd.to_numeric(df_work.get("effort_mins", 0), errors="coerce").fillna(0)) / 60.0
+
+        if "created_dt" in df_work.columns:
+            df_work["shift"] = df_work["created_dt"].apply(AutomatedReportGenerator.get_shift)
+        else:
+            df_work["shift"] = "Unknown"
 
         company_col = "company" if "company" in df_work.columns else "status"
         valid_dates = df_work.dropna(subset=["created_dt"])
@@ -43,8 +73,20 @@ class AutomatedReportGenerator:
         for agent_name, agent_group in df_work.groupby("agent"):
             total_agent_hrs = round(agent_group["effort_hours"].sum(), 1)
             total_tickets = len(agent_group)
-            weekly_hrs = round(total_agent_hrs / weeks_count, 1)
-            monthly_hrs = round(total_agent_hrs / months_count, 1)
+            
+            # Calculate agent present days based on unique dates they handled tickets
+            if "created_dt" in agent_group.columns and not agent_group["created_dt"].dropna().empty:
+                # Can also include resolved_dt if we want more accuracy, but created_dt is a good proxy for now
+                present_days = agent_group["created_dt"].dt.date.nunique()
+            else:
+                present_days = 1
+                
+            if present_days == 0:
+                present_days = 1
+                
+            avg_daily_hrs = total_agent_hrs / present_days
+            weekly_hrs = round(avg_daily_hrs * 5, 1) # 5 working days per week
+            monthly_hrs = round(avg_daily_hrs * 21.67, 1) # ~21.67 working days per month
             pod_share = round((total_agent_hrs / total_pod_effort_hours) * 100, 1)
 
             proj_breakdown = ""
@@ -58,11 +100,32 @@ class AutomatedReportGenerator:
                 )
                 proj_breakdown = ", ".join([f"{k}: {v}h" for k, v in all_projs.items() if v > 0]) or "N/A"
 
+            # Determine Primary Shift
+            primary_shift = "Unknown"
+            expected_daily = 8.0
+            if "shift" in agent_group.columns and not agent_group["shift"].empty:
+                valid_shifts = agent_group[agent_group["shift"] != "Unknown"]
+                if not valid_shifts.empty:
+                    primary_shift = valid_shifts["shift"].mode().iloc[0]
+            
+            if primary_shift == "Morning":
+                expected_daily = 8.5
+            elif primary_shift == "Afternoon":
+                expected_daily = 8.0
+            elif primary_shift == "Night":
+                expected_daily = 7.5
+                
+            expected_weekly = expected_daily * 5
+            utilization_pct = round((weekly_hrs / expected_weekly) * 100, 1) if expected_weekly > 0 else 0.0
+
             agent_records.append({
                 "agent": agent_name,
+                "primary_shift": primary_shift,
                 "total_tickets": total_tickets,
                 "total_effort_hrs": total_agent_hrs,
                 "weekly_hrs": weekly_hrs,
+                "expected_weekly": expected_weekly,
+                "utilization_pct": utilization_pct,
                 "monthly_hrs": monthly_hrs,
                 "pod_share_pct": pod_share,
                 "top_projects": proj_breakdown
@@ -73,25 +136,29 @@ class AutomatedReportGenerator:
 
     @staticmethod
     def _enrich_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+        """Adds calculated columns, statuses, and logic to the master dataframe."""
         df_work = df.copy()
+        
+        # 1. Exclude US SRE POD Handover tickets
+        df_work = df_work[~df_work["subject"].astype(str).str.contains(r"(?i)US SRE.*Handover", na=False)]
         
         # Parse Dates
         if "created_time" in df_work.columns:
             df_work["created_dt"] = pd.to_datetime(df_work["created_time"], errors="coerce")
         if "resolved_time" in df_work.columns:
             df_work["resolved_dt"] = pd.to_datetime(df_work["resolved_time"], errors="coerce")
+            
+        # Determine Shift Based on created_dt
+        if "created_dt" in df_work.columns:
+            df_work["shift"] = df_work["created_dt"].apply(AutomatedReportGenerator.get_shift)
+        else:
+            df_work["shift"] = "Unknown"
 
-        # Ticket Type Classification (SR vs Incident)
-        is_sr = pd.Series(False, index=df_work.index)
-        for col in df_work.columns:
-            if col.lower().strip() in ["category", "type", "ticket_type", "ticket type"]:
-                is_sr = is_sr | df_work[col].astype(str).str.contains(r"(?i)(service request|\bsr\b)", na=False)
-        if "subject" in df_work.columns:
-            sr_keywords = r"(?i)(service request|\bsr\b|grant is awaiting|approve or deny|grant access|access request)"
-            is_sr = is_sr | df_work["subject"].astype(str).str.contains(sr_keywords, na=False)
-        
-        df_work["is_sr"] = is_sr
-        df_work["calc_type"] = df_work["is_sr"].apply(lambda x: "Service Request" if x else "Incident")
+        # 2. Identify SRs vs Incidents strictly based on Alarm Source
+        alarm_source_norm = df_work["alarm_source"].astype(str).str.strip().str.upper()
+        df_work["calc_type"] = "Incident"
+        df_work.loc[alarm_source_norm == "SR", "calc_type"] = "Service Request"
+        df_work["is_sr"] = df_work["calc_type"] == "Service Request"
 
         # Status Grouping
         def group_status(val):
@@ -477,11 +544,8 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
             "created_dt": "Created Date",
             "status": "Status",
             "priority": "Priority",
-            "category": "Category",
-            "agent": "Assigned Engineer",
-            "effort_hours": "Effort (hrs)",
-            "resolution_hours": "Res Time (hrs)",
-            "sla_breached": "SLA Breached"
+            "effort_mins": "Effort_mins",
+            "subject": "Case Subject"
         }
         
         sr_html = f"""
@@ -494,7 +558,7 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                 {render_kpi_card("Avg Res Time", f"{sr_avg_res:.1f} hrs" if pd.notna(sr_avg_res) else "N/A")}
             </div>
             <h3 class="subsection-title">Top 10 Highest-Effort Service Requests</h3>
-            {generate_table(sr_df.sort_values(by="effort_hours", ascending=False, na_position="last").head(10), sr_cols)}
+            {generate_table(sr_df.sort_values(by="effort_mins", ascending=False, na_position="last").head(10), sr_cols)}
         </div>
         """
         
@@ -514,7 +578,7 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                 {render_kpi_card("Avg Res Time", f"{inc_avg_res:.1f} hrs" if pd.notna(inc_avg_res) else "N/A")}
             </div>
             <h3 class="subsection-title">Top 10 Highest-Effort Incidents</h3>
-            {generate_table(inc_df.sort_values(by="effort_hours", ascending=False, na_position="last").head(10), sr_cols)}
+            {generate_table(inc_df.sort_values(by="effort_mins", ascending=False, na_position="last").head(10), sr_cols)}
         </div>
         """
         

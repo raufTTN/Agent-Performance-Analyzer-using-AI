@@ -90,7 +90,19 @@ class LegacyDataStagingGateway:
     def seed_database_from_csv(file_path: str) -> int:
         """Parses CSV rows and seeds SQLite with the selected dataset."""
         try:
-            df = pd.read_csv(file_path)
+            required_normalized = {
+                "createdtime", "resolvedtime", "subject", "description", "priority", "agent",
+                "resolutionapplied", "resolutionnote", "status", "effortrequiredtoresolve(inmins)",
+                "resolutionhours", "ticketid", "id", "group", "ticketgroup", "assignedgroup",
+                "alarmsource", "source", "affectedci", "ci", "asset", "issuebucket", "bucket",
+                "tickettype", "type", "urgency", "company", "accountname", "category"
+            }
+            
+            def is_required_col(col_name: str) -> bool:
+                norm_col = re.sub(r'[\s_\-]+', '', str(col_name)).lower()
+                return norm_col in required_normalized
+
+            df = pd.read_csv(file_path, usecols=is_required_col)
             df.columns = df.columns.str.strip()
 
             with get_db_connection() as conn:

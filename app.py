@@ -416,7 +416,46 @@ if avg_res_hours is not None and not pd.isna(avg_res_hours):
     c4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
 
 
+<<<<<<< HEAD
 # Section 3: SLA Compliance Target Ticket Data Grid
+=======
+# Section 2.5: Shift Volume Distribution
+if "created_dt" in filtered_df.columns:
+    filtered_df["shift"] = filtered_df["created_dt"].apply(AutomatedReportGenerator.get_shift)
+    st.markdown("---")
+    st.subheader("Ticket Volume Distribution by Shift")
+    shift_counts = filtered_df["shift"].value_counts().reset_index()
+    shift_counts.columns = ["Shift", "Ticket Count"]
+    st.bar_chart(shift_counts.set_index("Shift"))
+
+
+# Section 3: Individual Engineer Time Utilization (US SRE Pod)
+st.markdown("---")
+st.subheader("⏱️ Individual Engineer Time Utilization (US SRE Pod)")
+st.caption("Calculates individual engineer workload in hours: Total Time, Weekly Rate (Hrs/Wk), Monthly Capacity (Hrs/Mo), and Project Allocations. Includes dynamic expected hours based on ticket shift timings.")
+
+pod_util_df = AutomatedReportGenerator.calculate_individual_pod_utilization(filtered_df)
+
+if not pod_util_df.empty:
+    display_util = pod_util_df.rename(columns={
+        "agent": "SRE Engineer",
+        "primary_shift": "Primary Shift",
+        "total_tickets": "Tickets Handled",
+        "total_effort_hrs": "Total Effort (Hours)",
+        "expected_weekly": "Expected Capacity (Hrs/Wk)",
+        "weekly_hrs": "Actual Rate (Hrs/Wk)",
+        "utilization_pct": "Utilization (%)",
+        "monthly_hrs": "Monthly Rate (Hrs/Mo)",
+        "pod_share_pct": "Pod Workload Share (%)",
+        "top_projects": "Project / Account Allocations (Hours)"
+    })
+    st.dataframe(display_util, use_container_width=True, hide_index=True)
+else:
+    st.caption("No individual pod utilization records available in current scope.")
+
+
+# Section 4: SLA Compliance Target Ticket Data Grid
+>>>>>>> 9975b0b (Fixing the ticket export field issue, it will only use the relevant columns which will be required from all fields ticket dump in runtime)
 st.markdown("---")
 st.subheader("📋 SLA Inception Status Tracking Tables")
 
