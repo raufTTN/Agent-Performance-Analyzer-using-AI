@@ -300,18 +300,23 @@ class AutomatedReportGenerator:
             headers = "".join([f"<th>{name}</th>" for _, name in columns_map.items()])
             rows = ""
             for _, row in df_subset.iterrows():
-                tds = "".join([f"<td>{row.get(col, 'N/A')}</td>" for col in columns_map.keys()])
-                rows += f"<tr>{tds}</tr>"
+                row_cells = ""
+                for col_key, _ in columns_map.items():
+                    val = row.get(col_key, "")
+                    if pd.isna(val): val = ""
+                    # Truncate long strings
+                    if isinstance(val, str) and len(val) > 100:
+                        val = val[:97] + "..."
+                    row_cells += f"<td>{val}</td>"
+                rows += f"<tr>{row_cells}</tr>"
                 
             return f"""
-            <table class="data-table">
-                <thead>
-                    <tr>{headers}</tr>
-                </thead>
-                <tbody>
-                    {rows}
-                </tbody>
-            </table>
+            <div class="table-container">
+                <table class="styled-table">
+                    <thead><tr>{headers}</tr></thead>
+                    <tbody>{rows}</tbody>
+                </table>
+            </div>
             """
             
         # -- REPORT SECTIONS --
@@ -431,6 +436,9 @@ class AutomatedReportGenerator:
         
         # 7. Activity / Workload Summary
         util_df = team_util_df if team_util_df is not None and not team_util_df.empty else AutomatedReportGenerator.calculate_individual_pod_utilization(df)
+        if scope != "All Agents" and not util_df.empty and "agent" in util_df.columns:
+            util_df = util_df[util_df["agent"] == scope]
+            
         util_cols = {
             "agent": "SRE Engineer",
             "total_tickets": "Tickets Handled",
