@@ -17,6 +17,7 @@ from analytics.ticket_explorer import show_ai_investigator_ui
 from utils.insights import AutomatedReportGenerator
 from analytics.root_cause import SystemicRootCauseEngine
 from analytics.capacity import AgentCapacityProfiler
+from analytics.hygiene import FieldValidationAuditor
 
 # Initialize local database schema tables setup handshake protocol immediately
 initialize_database()
@@ -222,6 +223,9 @@ selected_effort_exclusion = st.sidebar.multiselect(
     "Exclude Tickets by Effort (mins):", effort_options, default=[]
 )
 
+st.sidebar.markdown("---")
+exclude_merge = st.sidebar.checkbox("🚫 Exclude Merged Tickets", value=False, help="Filters out tickets where the Issue Bucket indicates they were merged.")
+
 # --- EXECUTE MULTI-FILTER ROUTING PARSING ---
 filtered_df = df_filtered_base.copy()
 
@@ -260,6 +264,10 @@ if selected_type != "All Types (SR & Incident)":
         filtered_df = filtered_df[is_sr]
     elif selected_type == "Incident":
         filtered_df = filtered_df[~is_sr]
+
+# Apply Merged Ticket Exclusion
+if exclude_merge and "issue_bucket" in filtered_df.columns:
+    filtered_df = filtered_df[~filtered_df["issue_bucket"].astype(str).str.lower().str.contains("merged", na=False)]
 
 # Calculate utilization metrics on the team-wide data (before filtering for specific agent)
 team_utilization_df = AgentCapacityProfiler.calculate_utilization(filtered_df)
@@ -675,7 +683,45 @@ else:
         "Insufficient active records available to calculate team metrics ranking values."
     )
 
-# Section 7: Local AI Agent Career Coaching Workshop
+# Section 7: Freshservice Field Validation & Form Hygiene Hub
+st.markdown("---")
+st.subheader("📋 Freshservice Field Validation & Form Hygiene Hub")
+st.caption("Audits mandatory field completeness (Group, Priority, Company, Category, Type) and sub-category hygiene across tickets and engineers.")
+
+# Generate DataFrames
+agent_scorecard = FieldValidationAuditor.generate_agent_scorecard(filtered_df)
+flagged_tickets, compliant_tickets = FieldValidationAuditor.generate_ticket_inspector(filtered_df)
+
+tab_agent, tab_ticket = st.tabs([
+    "👤 Agent-Wise Field Hygiene Scorecard",
+    "🎟️ Ticket-Wise Field Validation Inspector"
+])
+
+with tab_agent:
+    if not agent_scorecard.empty:
+        st.dataframe(agent_scorecard, use_container_width=True, hide_index=True)
+    else:
+        st.caption("No agent form hygiene records to display.")
+
+with tab_ticket:
+    sub_flagged, sub_compliant = st.tabs([
+        f"🚨 Flagged / Missing Fields ({len(flagged_tickets)})",
+        f"✅ 100% Compliant Tickets ({len(compliant_tickets):,})"
+    ])
+    
+    with sub_flagged:
+        if not flagged_tickets.empty:
+            st.dataframe(flagged_tickets, use_container_width=True, hide_index=True)
+        else:
+            st.success("All tickets are 100% compliant!")
+            
+    with sub_compliant:
+        if not compliant_tickets.empty:
+            st.dataframe(compliant_tickets, use_container_width=True, hide_index=True)
+        else:
+            st.caption("No perfectly compliant tickets found.")
+
+# Section 8: Local AI Agent Career Coaching Workshop
 st.markdown("---")
 st.subheader("🧠 Air-Gapped Local AI Agent Career Coaching Workshop")
 coach_target = st.selectbox(

@@ -12,6 +12,14 @@ def initialize_database():
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
+        # Safely migrate existing tables by attempting to add new columns
+        try:
+            cursor.execute("ALTER TABLE tickets ADD COLUMN assigned_group TEXT")
+            cursor.execute("ALTER TABLE tickets ADD COLUMN alarm_source TEXT")
+            cursor.execute("ALTER TABLE tickets ADD COLUMN issue_bucket TEXT")
+        except sqlite3.OperationalError:
+            pass # Columns already exist or table doesn't exist yet
+            
         # Primary Relational Tickets Storage Table Structure
         # Included company, ticket_type, category, and sub_category
         cursor.execute("""
@@ -26,6 +34,9 @@ def initialize_database():
                 ticket_type TEXT,
                 category TEXT,
                 sub_category TEXT,
+                assigned_group TEXT,
+                alarm_source TEXT,
+                issue_bucket TEXT,
                 agent TEXT,
                 resolution_applied TEXT,
                 resolution_note TEXT,

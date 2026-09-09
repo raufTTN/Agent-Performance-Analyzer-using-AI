@@ -163,6 +163,11 @@ class LegacyDataStagingGateway:
         priority,
         company,
         ticket_type,
+        category,
+        sub_category,
+        assigned_group,
+        alarm_source,
+        issue_bucket,
         agent,
         resolution_applied,
         resolution_note,
@@ -171,7 +176,7 @@ class LegacyDataStagingGateway:
         resolution_hours,
         updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 
     ON CONFLICT(ticket_id) DO UPDATE SET
         created_time = excluded.created_time,
@@ -181,6 +186,11 @@ class LegacyDataStagingGateway:
         priority = excluded.priority,
         company = excluded.company,
         ticket_type = excluded.ticket_type,
+        category = excluded.category,
+        sub_category = excluded.sub_category,
+        assigned_group = excluded.assigned_group,
+        alarm_source = excluded.alarm_source,
+        issue_bucket = excluded.issue_bucket,
         agent = excluded.agent,
         resolution_applied = excluded.resolution_applied,
         resolution_note = excluded.resolution_note,
@@ -202,6 +212,11 @@ class LegacyDataStagingGateway:
                                 )
                             ).strip(),
                             str(row.get("Type")).strip(),
+                            str(row.get("Category")).strip(),
+                            str(row.get("Sub-Category", row.get("Sub Category", ""))).strip(),
+                            str(row.get("Group")).strip(),
+                            str(row.get("Alarm Source")).strip(),
+                            str(row.get("Issue Bucket")).strip(),
                             str(row.get("Agent")).strip(),
                             row.get("Resolution Applied"),
                             row.get("Resolution Note"),
