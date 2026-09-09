@@ -6,6 +6,7 @@ import pdfkit
 import re
 
 from analytics.scoring import OperationsLeaderboardScorer
+from analytics.reports import ExcelReportsGenerator
 from config import LLM_TIMEOUT, OLLAMA_API_URL, OLLAMA_MODEL, REPORTS_DIR
 
 
@@ -484,7 +485,43 @@ class AutomatedReportGenerator:
         </div>
         """
         
-        # Detailed Record-Level Data section removed as requested
+        # 9. Advanced Detailed Operations & Utilization Reports
+        # Generate the dataframes
+        top_accounts_df = ExcelReportsGenerator.generate_top_accounts_report(df, working_days=20.0)
+        working_stats_df = ExcelReportsGenerator.generate_agent_working_stats(df)
+        agent_pivot_df = ExcelReportsGenerator.generate_agent_pivot(df)
+        agent_util_df = ExcelReportsGenerator.generate_agent_utilization(df, working_days=20.0)
+        client_count_df = ExcelReportsGenerator.generate_client_ticket_count(df)
+        
+        # Format utilization with % for HTML
+        if not top_accounts_df.empty:
+            top_accounts_df['L1 Team Utilization per Account'] = top_accounts_df['L1 Team Utilization per Account'].apply(lambda x: f"{x:.2f}%")
+        if not agent_util_df.empty:
+            agent_util_df['Utilization %'] = agent_util_df['Utilization %'].apply(lambda x: f"{x:.2%}")
+            
+        advanced_reports_html = f"""
+        <div class="section page-break-inside-avoid">
+            <h2 class="section-title">9. Advanced Detailed Operations & Utilization Reports</h2>
+            <p style="font-size: 13px; color: #475569; margin-bottom: 16px;">Native spreadsheet-style data aggregations pulled directly from the operations dataset.</p>
+            
+            <h3 class="subsection-title">Top Accounts Utilization Analysis</h3>
+            {generate_table(top_accounts_df, {col: col for col in top_accounts_df.columns}) if not top_accounts_df.empty else "<p>No data</p>"}
+            
+            <h3 class="subsection-title">Individual Agent Working Stats</h3>
+            {generate_table(working_stats_df, {col: col for col in working_stats_df.columns}) if not working_stats_df.empty else "<p>No data</p>"}
+            
+            <h3 class="subsection-title">Agent KPI Pivot Table</h3>
+            {generate_table(agent_pivot_df, {col: col for col in agent_pivot_df.columns}) if not agent_pivot_df.empty else "<p>No data</p>"}
+            
+            <h3 class="subsection-title">Agent Utilization % Breakdown</h3>
+            {generate_table(agent_util_df, {col: col for col in agent_util_df.columns}) if not agent_util_df.empty else "<p>No data</p>"}
+            
+            <h3 class="subsection-title">Client Ticket Count Aggregation</h3>
+            <div style="max-width: 500px;">
+                {generate_table(client_count_df, {col: col for col in client_count_df.columns}) if not client_count_df.empty else "<p>No data</p>"}
+            </div>
+        </div>
+        """
         
         full_html = f"""
         <!DOCTYPE html>
@@ -635,8 +672,8 @@ class AutomatedReportGenerator:
             {res_perf_html}
             {sla_html}
             {feedback_html}
-            {workload_html}
             {aging_html}
+            {advanced_reports_html}
             
             <div style="text-align: center; margin-top: 40px; font-size: 10px; color: #94a3b8;">
                 End of Report • Generated automatically from source operations data.

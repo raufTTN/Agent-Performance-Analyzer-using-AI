@@ -227,8 +227,8 @@ selected_effort_exclusion = st.sidebar.multiselect(
 st.sidebar.markdown("---")
 exclude_merge = st.sidebar.checkbox("🚫 Exclude Merged Tickets", value=False, help="Filters out tickets where the Issue Bucket indicates they were merged.")
 
-st.sidebar.markdown("---")
-standard_working_days = st.sidebar.slider("Standard Working Days in Period", min_value=1.0, max_value=31.0, value=20.0, step=0.5, help="Used for calculating Total Agent Utilization %")
+# Hardcoded base for utilization math
+standard_working_days = 20.0
 
 # --- EXECUTE MULTI-FILTER ROUTING PARSING ---
 filtered_df = df_filtered_base.copy()
@@ -481,11 +481,10 @@ with c2: st.markdown(render_kpi_card("SLA Compliance Rate Percentage", f"{sla_me
 with c3: st.markdown(render_kpi_card("Total SLA Resolution Breaches", f"{sla_metrics['breach_count']}", "var(--accent-red)", "Failed"), unsafe_allow_html=True)
 
 st.write("")
-c4, c5, c6, c7 = st.columns(4)
+c4, c5, c6 = st.columns(3)
 with c4: st.markdown(render_kpi_card("Pod Total Effort (US SRE)", f"{total_effort_hrs:.1f} Hrs", "var(--text-secondary)", ""), unsafe_allow_html=True)
-with c5: st.markdown(render_kpi_card("Weekly Effort Rate", f"{weekly_effort_rate:.1f} Hrs/Wk", "var(--text-secondary)", ""), unsafe_allow_html=True)
-with c6: st.markdown(render_kpi_card("Monthly Effort Capacity", f"{monthly_effort_capacity:.1f} Hrs/Mo", "var(--text-secondary)", ""), unsafe_allow_html=True)
-with c7: st.markdown(render_kpi_card("Avg Effort Per Ticket", f"{avg_effort_mins:.1f} Mins", "var(--text-secondary)", ""), unsafe_allow_html=True)
+with c5: st.markdown(render_kpi_card("Monthly Effort Capacity", f"{monthly_effort_capacity:.1f} Hrs/Mo", "var(--text-secondary)", ""), unsafe_allow_html=True)
+with c6: st.markdown(render_kpi_card("Avg Effort Per Ticket", f"{avg_effort_mins:.1f} Mins", "var(--text-secondary)", ""), unsafe_allow_html=True)
 
 
 
