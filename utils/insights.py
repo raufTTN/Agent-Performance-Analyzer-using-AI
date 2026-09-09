@@ -10,20 +10,8 @@ from config import LLM_TIMEOUT, OLLAMA_API_URL, OLLAMA_MODEL, REPORTS_DIR
 
 
 class AutomatedReportGenerator:
-    @staticmethod
-    def generate_rich_executive_report(df: pd.DataFrame, selected_agent: str = "All Agents", team_util_df: pd.DataFrame = None) -> dict:
-        if df.empty:
-            return {"error": "Execution skipped: Database scope currently empty."}
 
     @staticmethod
-<<<<<<< HEAD
-<<<<<<< HEAD
-    def compile_executive_html(df: pd.DataFrame, selected_agent: str = "All Agents", team_util_df: pd.DataFrame = None) -> str:
-        """
-        Compiles all scoped metrics, agent scorecards, and AI remarks into a standalone HTML report.
-        """
-=======
-=======
     def get_shift(dt) -> str:
         if pd.isna(dt):
             return "Unknown"
@@ -46,7 +34,6 @@ class AutomatedReportGenerator:
             return "Unknown"
 
     @staticmethod
->>>>>>> 9975b0b (Fixing the ticket export field issue, it will only use the relevant columns which will be required from all fields ticket dump in runtime)
     def calculate_individual_pod_utilization(df: pd.DataFrame) -> pd.DataFrame:
         if df.empty or "agent" not in df.columns:
             return pd.DataFrame()
@@ -71,22 +58,27 @@ class AutomatedReportGenerator:
 
         agent_records = []
         for agent_name, agent_group in df_work.groupby("agent"):
+            primary_shift = "Unknown"
+            if "shift" in agent_group.columns:
+                shift_counts = agent_group["shift"].value_counts()
+                if not shift_counts.empty:
+                    primary_shift = shift_counts.index[0]
+
+            expected_weekly = 40.0
+            if primary_shift == "Night":
+                expected_weekly = 32.0
+            elif primary_shift == "Morning":
+                expected_weekly = 40.0
+            elif primary_shift == "Afternoon":
+                expected_weekly = 37.5
+
             total_agent_hrs = round(agent_group["effort_hours"].sum(), 1)
             total_tickets = len(agent_group)
+            weekly_hrs = round(total_agent_hrs / weeks_count, 1)
             
-            # Calculate agent present days based on unique dates they handled tickets
-            if "created_dt" in agent_group.columns and not agent_group["created_dt"].dropna().empty:
-                # Can also include resolved_dt if we want more accuracy, but created_dt is a good proxy for now
-                present_days = agent_group["created_dt"].dt.date.nunique()
-            else:
-                present_days = 1
-                
-            if present_days == 0:
-                present_days = 1
-                
-            avg_daily_hrs = total_agent_hrs / present_days
-            weekly_hrs = round(avg_daily_hrs * 5, 1) # 5 working days per week
-            monthly_hrs = round(avg_daily_hrs * 21.67, 1) # ~21.67 working days per month
+            util_pct = round((weekly_hrs / expected_weekly) * 100, 1) if expected_weekly > 0 else 0.0
+            
+            monthly_hrs = round(total_agent_hrs / months_count, 1)
             pod_share = round((total_agent_hrs / total_pod_effort_hours) * 100, 1)
 
             proj_breakdown = ""
@@ -100,32 +92,14 @@ class AutomatedReportGenerator:
                 )
                 proj_breakdown = ", ".join([f"{k}: {v}h" for k, v in all_projs.items() if v > 0]) or "N/A"
 
-            # Determine Primary Shift
-            primary_shift = "Unknown"
-            expected_daily = 8.0
-            if "shift" in agent_group.columns and not agent_group["shift"].empty:
-                valid_shifts = agent_group[agent_group["shift"] != "Unknown"]
-                if not valid_shifts.empty:
-                    primary_shift = valid_shifts["shift"].mode().iloc[0]
-            
-            if primary_shift == "Morning":
-                expected_daily = 8.5
-            elif primary_shift == "Afternoon":
-                expected_daily = 8.0
-            elif primary_shift == "Night":
-                expected_daily = 7.5
-                
-            expected_weekly = expected_daily * 5
-            utilization_pct = round((weekly_hrs / expected_weekly) * 100, 1) if expected_weekly > 0 else 0.0
-
             agent_records.append({
                 "agent": agent_name,
                 "primary_shift": primary_shift,
                 "total_tickets": total_tickets,
                 "total_effort_hrs": total_agent_hrs,
-                "weekly_hrs": weekly_hrs,
                 "expected_weekly": expected_weekly,
-                "utilization_pct": utilization_pct,
+                "weekly_hrs": weekly_hrs,
+                "utilization_pct": util_pct,
                 "monthly_hrs": monthly_hrs,
                 "pod_share_pct": pod_share,
                 "top_projects": proj_breakdown
@@ -136,29 +110,25 @@ class AutomatedReportGenerator:
 
     @staticmethod
     def _enrich_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-        """Adds calculated columns, statuses, and logic to the master dataframe."""
         df_work = df.copy()
-        
-        # 1. Exclude US SRE POD Handover tickets
-        df_work = df_work[~df_work["subject"].astype(str).str.contains(r"(?i)US SRE.*Handover", na=False)]
         
         # Parse Dates
         if "created_time" in df_work.columns:
             df_work["created_dt"] = pd.to_datetime(df_work["created_time"], errors="coerce")
         if "resolved_time" in df_work.columns:
             df_work["resolved_dt"] = pd.to_datetime(df_work["resolved_time"], errors="coerce")
-            
-        # Determine Shift Based on created_dt
-        if "created_dt" in df_work.columns:
-            df_work["shift"] = df_work["created_dt"].apply(AutomatedReportGenerator.get_shift)
-        else:
-            df_work["shift"] = "Unknown"
 
-        # 2. Identify SRs vs Incidents strictly based on Alarm Source
-        alarm_source_norm = df_work["alarm_source"].astype(str).str.strip().str.upper()
-        df_work["calc_type"] = "Incident"
-        df_work.loc[alarm_source_norm == "SR", "calc_type"] = "Service Request"
-        df_work["is_sr"] = df_work["calc_type"] == "Service Request"
+        # Ticket Type Classification (SR vs Incident)
+        is_sr = pd.Series(False, index=df_work.index)
+        for col in df_work.columns:
+            if col.lower().strip() in ["category", "type", "ticket_type", "ticket type"]:
+                is_sr = is_sr | df_work[col].astype(str).str.contains(r"(?i)(service request|\bsr\b)", na=False)
+        if "subject" in df_work.columns:
+            sr_keywords = r"(?i)(service request|\bsr\b|grant is awaiting|approve or deny|grant access|access request)"
+            is_sr = is_sr | df_work["subject"].astype(str).str.contains(sr_keywords, na=False)
+        
+        df_work["is_sr"] = is_sr
+        df_work["calc_type"] = df_work["is_sr"].apply(lambda x: "Service Request" if x else "Incident")
 
         # Status Grouping
         def group_status(val):
@@ -214,123 +184,32 @@ class AutomatedReportGenerator:
         return df_work
 
     @staticmethod
-    def compile_executive_html(df: pd.DataFrame, selected_agent: str = "All Agents") -> str:
->>>>>>> d8bca66 (Reports Modified to show detailed agent performance with various metrics)
+    def generate_rich_executive_report(df: pd.DataFrame, selected_agent: str = "All Agents", team_util_df: pd.DataFrame = None) -> dict:
+        if df.empty:
+            return {"error": "Execution skipped: Database scope currently empty."}
+        return {"status": "success", "message": "Report generation stub"}
+
+    @staticmethod
+    def compile_executive_html(df: pd.DataFrame, selected_agent: str = "All Agents", team_util_df: pd.DataFrame = None) -> str:
         if df.empty:
             return ""
 
-        # Filter dataset for specific agent if requested
         if selected_agent != "All Agents" and "agent" in df.columns:
-            agent_df = df[df["agent"] == selected_agent].copy()
+            scoped_df = df[df["agent"] == selected_agent].copy()
         else:
-            agent_df = df.copy()
+            scoped_df = df.copy()
 
-<<<<<<< HEAD
-        # Extract Date Range dynamically
-        if "created_dt" in agent_df.columns and not agent_df["created_dt"].dropna().empty:
-            min_d = agent_df["created_dt"].min().strftime('%d %b %Y')
-            max_d = agent_df["created_dt"].max().strftime('%d %b %Y')
-=======
         scoped_df = AutomatedReportGenerator._enrich_dataframe(scoped_df)
 
         if "created_dt" in scoped_df.columns and not scoped_df["created_dt"].dropna().empty:
             min_d = scoped_df["created_dt"].min().strftime('%d %b %Y')
             max_d = scoped_df["created_dt"].max().strftime('%d %b %Y')
->>>>>>> d8bca66 (Reports Modified to show detailed agent performance with various metrics)
             date_range_str = f"{min_d} – {max_d}"
         else:
             date_range_str = "Full History Scope"
 
-<<<<<<< HEAD
-        # 1. Executive Metrics Calculations
-        total_tickets = len(agent_df)
-        total_breaches = int(agent_df["sla_breached"].sum()) if "sla_breached" in agent_df.columns else 0
-        compliance = round(((total_tickets - total_breaches) / total_tickets) * 100, 1) if total_tickets > 0 else 100.0
-        avg_resolution = round(agent_df["resolution_hours"].mean(), 2) if "resolution_hours" in agent_df.columns else 0
-        total_effort = round(agent_df["effort_mins"].sum(), 0) if "effort_mins" in agent_df.columns else 0
-
-        # Calculate SR vs Incident count dynamically
-        is_sr = pd.Series(False, index=agent_df.index)
-        for col in agent_df.columns:
-            if col.lower().strip() in ['category', 'type', 'ticket_type', 'ticket type']:
-                is_sr = is_sr | agent_df[col].astype(str).str.contains(r"(?i)(service request|\bsr\b)", na=False)
-        if "subject" in agent_df.columns:
-            sr_keywords = r"(?i)(service request|\bsr\b|grant is awaiting|approve or deny|grant access|access request)"
-            is_sr = is_sr | agent_df["subject"].astype(str).str.contains(sr_keywords, na=False)
-            
-        total_sr = int(is_sr.sum())
-        total_incidents = total_tickets - total_sr
-
-        # 2. Categorical & Company Distribution
-        def get_dist(col_name):
-            if col_name in agent_df.columns:
-                return agent_df[col_name].value_counts().to_dict()
-            return {}
-
-        company_col = "company" if "company" in agent_df.columns else "status"
-        company_dist = get_dist(company_col)
-        priority_dist = get_dist("priority")
-        type_dist = get_dist("ticket_type") if "ticket_type" in agent_df.columns else {}
-
-        # 3. Per-Agent Leaderboard Rankings
-        agent_rankings = pd.DataFrame()
-        if "agent" in agent_df.columns:
-            agent_rankings = OperationsLeaderboardScorer.compile_weighted_rankings(
-                agent_df, context_type="All Types (SR & Incident)"
-            )
-
-        # 4. Local AI Generated Strategic Remarks
-        ai_remarks = {}
-        if not agent_rankings.empty:
-            prompt_data = agent_rankings.head(10).to_dict(orient="records")
-            prompt = f"""
-You are an expert IT Operations Manager. Analyze this agent performance data:
-{json.dumps(prompt_data, indent=2)}
-
-Provide a very short (1 sentence) performance remark for each agent highlighting their key strength or weakness (e.g. "High volume but needs to improve SLA compliance").
-Format your response as a strict JSON dictionary mapping the agent's name to the remark string.
-"""
-            payload = {
-                "model": OLLAMA_MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "format": "json",
-                "options": {"temperature": 0.2, "num_predict": 500}
-            }
-            try:
-                res = requests.post(OLLAMA_API_URL, json=payload, timeout=LLM_TIMEOUT)
-                if res.status_code == 200:
-                    raw_resp = res.json().get('response', '{}')
-                    ai_remarks = json.loads(raw_resp)
-            except Exception:
-                ai_remarks = {}
-        
-        date_range_str = datetime.now().strftime('%Y-%m-%d')
-                
-        # 5. Build HTML Content
-        html_content = AutomatedReportGenerator._build_html(
-            total_tickets, compliance, total_breaches, avg_resolution, total_effort,
-            total_sr, total_incidents, agent_rankings, ai_remarks,
-            company_dist, priority_dist, type_dist, selected_agent, date_range_str, team_util_df
-        )
-        
-        # 6. PDF Generation Fallback
-        pdf_bytes = None
-        try:
-            # pyrefly: ignore [missing-import]
-            from xhtml2pdf import pisa
-            import io
-            result = io.BytesIO()
-            # xhtml2pdf requires string or file-like object
-            pdf = pisa.pisaDocument(io.StringIO(html_content), result)
-            if not pdf.err:
-                pdf_bytes = result.getvalue()
-        except ImportError:
-            pass
-=======
         # Generate HTML report content
-        html_content = AutomatedReportGenerator._build_comprehensive_html(scoped_df, date_range_str, selected_agent)
->>>>>>> d8bca66 (Reports Modified to show detailed agent performance with various metrics)
+        html_content = AutomatedReportGenerator._build_comprehensive_html(scoped_df, date_range_str, selected_agent, team_util_df)
 
         filename = f"executive_review_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
         report_path = REPORTS_DIR / filename
@@ -345,20 +224,17 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
 
     @staticmethod
     def compile_executive_pdf(html_path: str) -> str:
-        """
-        Converts a compiled HTML executive report into a PDF document using pdfkit/wkhtmltopdf.
-        """
         if not html_path or not Path(html_path).exists():
             return ""
 
         pdf_path = html_path.replace(".html", ".pdf")
-
         options = {
             'page-size': 'A4',
-            'margin-top': '0.5in',
-            'margin-right': '0.5in',
-            'margin-bottom': '0.5in',
-            'margin-left': '0.5in',
+            'orientation': 'Landscape',
+            'margin-top': '0.4in',
+            'margin-right': '0.4in',
+            'margin-bottom': '0.4in',
+            'margin-left': '0.4in',
             'encoding': "UTF-8",
             'enable-local-file-access': None,
             'no-outline': None,
@@ -373,78 +249,7 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
             return ""
 
     @staticmethod
-<<<<<<< HEAD
-    def _build_html(total, compliance, breaches, avg_res, total_effort, total_sr, total_incidents, agent_rankings, remarks, c_dist, p_dist, t_dist, scope, date_range, team_util_df):
-        now_str = datetime.now().strftime('%d %b %Y, %H:%M')
-
-        # Generate rows for agent scorecard table
-        agent_rows = ""
-        if not agent_rankings.empty:
-            for i, row in agent_rankings.reset_index(drop=True).iterrows():
-                agent_name = row.get('agent', 'Unknown')
-                score = row.get('Performance_Score', 'N/A')
-                vol = row.get('Tickets_Handled', 0)
-                res_hr = row.get('Avg_Resolution_Hours', 0)
-                remark = remarks.get(agent_name, "Solid operational performance.")
-
-                row_class = "row-alt" if i % 2 != 0 else ""
-
-                agent_rows += f"""
-                <tr class="{row_class}">
-                    <td><strong>{agent_name}</strong></td>
-                    <td><span class="badge badge-info">{score}%</span></td>
-                    <td>{vol}</td>
-                    <td>{res_hr} hrs</td>
-                    <td style="font-size: 0.9em; color: #475569;">{remark}</td>
-                </tr>
-                """
-
-        def dict_to_html_list(d):
-            if not d:
-                return "<li>No data available</li>"
-            return "".join([f"<li><strong>{k}:</strong> {v}</li>" for k, v in list(d.items())[:5]])
-            
-        agent_util_html = ""
-        if scope != "All Agents" and team_util_df is not None and not team_util_df.empty:
-            agent_row = team_util_df[team_util_df['agent'] == scope]
-            if not agent_row.empty:
-                r_data = agent_row.iloc[0]
-                status = r_data['Utilization_Status']
-                effort_mins = int(r_data['Total_Effort_Mins'])
-                hrs, mins = divmod(effort_mins, 60)
-                effort_str = f"{hrs}h {mins}m"
-                tickets = int(r_data['Total_Tickets'])
-                
-                status_color = "#10b981" if status == "Optimally Utilized" else "#ef4444" if status == "Overutilized" else "#f59e0b"
-                
-                agent_util_html = f"""
-                <div class="card util-card" style="border-left-color: {status_color}; margin-bottom: 25px;">
-                    <table style="width: 100%; border: none; margin: 0; padding: 0;">
-                        <tr>
-                            <td style="border: none; padding: 0; vertical-align: middle;">
-                                <div class="section-title" style="border:none; margin:0; padding:0; font-size: 18px;">Agent Capacity & Utilization Profile</div>
-                            </td>
-                            <td style="border: none; padding: 0; text-align: right; vertical-align: middle;">
-                                <span class="badge" style="background-color: {status_color}; color: #ffffff; font-size: 12px; padding: 6px 12px;">{status}</span>
-                            </td>
-                        </tr>
-                    </table>
-                    <table style="width: 100%; border: none; margin-top: 20px;">
-                        <tr>
-                            <td width="50%" style="border: none; padding: 0;">
-                                <div class="card-title">Total Effort Logged</div>
-                                <div class="card-value">{effort_str}</div>
-                            </td>
-                            <td width="50%" style="border: none; padding: 0;">
-                                <div class="card-title">Total Tickets Handled</div>
-                                <div class="card-value">{tickets}</div>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-                """
-=======
-    def _build_comprehensive_html(df: pd.DataFrame, date_range: str, scope: str) -> str:
+    def _build_comprehensive_html(df: pd.DataFrame, date_range: str, scope: str, team_util_df: pd.DataFrame = None) -> str:
         now_str = datetime.now().strftime('%d %b %Y, %H:%M')
         
         # -- METRICS CALCULATION --
@@ -495,78 +300,75 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
             headers = "".join([f"<th>{name}</th>" for _, name in columns_map.items()])
             rows = ""
             for _, row in df_subset.iterrows():
-                row_cells = ""
-                for col_key, _ in columns_map.items():
-                    val = row.get(col_key, "")
-                    if pd.isna(val): val = ""
-                    # Truncate long strings
-                    if isinstance(val, str) and len(val) > 100:
-                        val = val[:97] + "..."
-                    row_cells += f"<td>{val}</td>"
-                rows += f"<tr>{row_cells}</tr>"
+                tds = "".join([f"<td>{row.get(col, 'N/A')}</td>" for col in columns_map.keys()])
+                rows += f"<tr>{tds}</tr>"
                 
             return f"""
-            <div class="table-container">
-                <table class="styled-table">
-                    <thead><tr>{headers}</tr></thead>
-                    <tbody>{rows}</tbody>
-                </table>
-            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>{headers}</tr>
+                </thead>
+                <tbody>
+                    {rows}
+                </tbody>
+            </table>
             """
->>>>>>> d8bca66 (Reports Modified to show detailed agent performance with various metrics)
-
-        # 1. Executive Summary
-        exec_summary_html = f"""
-        <div class="section">
-            <h2 class="section-title">1. Executive Summary</h2>
+            
+        # -- REPORT SECTIONS --
+        
+        # 1. Summary Overview
+        summary_html = f"""
+        <div class="section page-break-inside-avoid">
+            <h2 class="section-title">1. Summary Overview</h2>
             <div class="kpi-grid">
-                {render_kpi_card("Total Tickets", total_tickets, "primary")}
-                {render_kpi_card("Total SRs", total_srs)}
-                {render_kpi_card("Total Incidents", total_incidents)}
-                {render_kpi_card("Resolved / Closed", num_resolved_closed, "success")}
-                {render_kpi_card("Resolution Rate", f"{res_percentage}%", "success")}
-                {render_kpi_card("Open / Pending", num_open + num_pending, "warning")}
-                {render_kpi_card("SLA Compliance", f"{sla_percentage}%", "success" if sla_percentage >= 90 else "danger")}
-                {render_kpi_card("Avg Resolution Time", avg_res_time_str)}
-                {render_kpi_card("Total Effort", f"{total_effort_hrs:.1f} hrs")}
+                {render_kpi_card("Total Tickets Handled", total_tickets)}
+                {render_kpi_card("Overall Resolution Rate", f"{res_percentage}%", "success")}
+                {render_kpi_card("Overall SLA Compliance", f"{sla_percentage}%", "success" if sla_percentage >= 90 else "warning")}
+                {render_kpi_card("Total Logged Effort", f"{total_effort_hrs:.1f} hrs")}
             </div>
         </div>
         """
         
-        # 2. SR Details
-        sr_df = df[df["is_sr"]]
-        sr_res_count = len(sr_df[sr_df["is_resolved_closed"]])
-        sr_res_rate = round(sr_res_count / len(sr_df) * 100, 1) if len(sr_df) > 0 else 0
-        sr_avg_res = sr_df["resolution_hours_num"].mean()
-        
+        # 2. Service Request Details
         sr_cols = {
             "ticket_id": "Ticket ID",
-            "created_dt": "Created Date",
+            "created_time": "Created Date",
             "status": "Status",
             "priority": "Priority",
             "effort_mins": "Effort_mins",
             "subject": "Case Subject"
         }
         
+        sr_df = df[df["is_sr"]]
+        sr_res_count = len(sr_df[sr_df["is_resolved_closed"]])
+        sr_res_rate = round((sr_res_count / len(sr_df) * 100), 1) if len(sr_df) > 0 else 0
+        sr_avg_res = sr_df["resolution_hours_num"].dropna().mean()
+        
+        # Filter out handover tickets
+        sr_filtered = sr_df[~sr_df["subject"].str.contains(r"(?i)handover", na=False)]
+        
         sr_html = f"""
         <div class="section page-break-inside-avoid">
             <h2 class="section-title">2. Service Request Details</h2>
             <div class="kpi-grid">
-                {render_kpi_card("Total SRs", len(sr_df))}
+                {render_kpi_card("Total Service Requests", len(sr_df))}
                 {render_kpi_card("SRs Resolved", sr_res_count, "success")}
                 {render_kpi_card("Resolution Rate", f"{sr_res_rate}%")}
                 {render_kpi_card("Avg Res Time", f"{sr_avg_res:.1f} hrs" if pd.notna(sr_avg_res) else "N/A")}
             </div>
             <h3 class="subsection-title">Top 10 Highest-Effort Service Requests</h3>
-            {generate_table(sr_df.sort_values(by="effort_mins", ascending=False, na_position="last").head(10), sr_cols)}
+            {generate_table(sr_filtered.sort_values(by="effort_mins", ascending=False, na_position="last").head(10), sr_cols)}
         </div>
         """
         
         # 3. Incident Details
         inc_df = df[~df["is_sr"]]
         inc_res_count = len(inc_df[inc_df["is_resolved_closed"]])
-        inc_res_rate = round(inc_res_count / len(inc_df) * 100, 1) if len(inc_df) > 0 else 0
-        inc_avg_res = inc_df["resolution_hours_num"].mean()
+        inc_res_rate = round((inc_res_count / len(inc_df) * 100), 1) if len(inc_df) > 0 else 0
+        inc_avg_res = inc_df["resolution_hours_num"].dropna().mean()
+        
+        # Filter out handover tickets
+        inc_filtered = inc_df[~inc_df["subject"].str.contains(r"(?i)handover", na=False)]
         
         inc_html = f"""
         <div class="section page-break-inside-avoid">
@@ -578,7 +380,7 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                 {render_kpi_card("Avg Res Time", f"{inc_avg_res:.1f} hrs" if pd.notna(inc_avg_res) else "N/A")}
             </div>
             <h3 class="subsection-title">Top 10 Highest-Effort Incidents</h3>
-            {generate_table(inc_df.sort_values(by="effort_mins", ascending=False, na_position="last").head(10), sr_cols)}
+            {generate_table(inc_filtered.sort_values(by="effort_mins", ascending=False, na_position="last").head(10), sr_cols)}
         </div>
         """
         
@@ -628,7 +430,7 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
         """
         
         # 7. Activity / Workload Summary
-        util_df = AutomatedReportGenerator.calculate_individual_pod_utilization(df)
+        util_df = team_util_df if team_util_df is not None and not team_util_df.empty else AutomatedReportGenerator.calculate_individual_pod_utilization(df)
         util_cols = {
             "agent": "SRE Engineer",
             "total_tickets": "Tickets Handled",
@@ -681,125 +483,11 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
         <html>
         <head>
             <meta charset="utf-8">
-<<<<<<< HEAD
-            <title>Enterprise SRE & IT Operations Intelligence Report</title>
-=======
             <title>Comprehensive Operations Review Report</title>
->>>>>>> d8bca66 (Reports Modified to show detailed agent performance with various metrics)
             <style>
                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
                 
-                @page {{
-                    size: A4;
-                    margin: 1.2cm;
-                }}
-
-                @media print {{
-                    .card {{ page-break-inside: avoid; }}
-                    tr {{ page-break-inside: avoid; page-break-after: auto; }}
-                    table {{ page-break-inside: auto; }}
-                    thead {{ display: table-header-group; }}
-                }}
-
                 body {{
-<<<<<<< HEAD
-                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                    background-color: #ffffff;
-                    color: #1e293b;
-                    margin: 0;
-                    padding: 0;
-                    line-height: 1.5;
-                }}
-                
-                .header {{
-                    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-                    color: #ffffff;
-                    padding: 25px 30px;
-                    border-radius: 6px;
-                    margin-bottom: 25px;
-                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                }}
-                
-                .header h1 {{ margin: 0 0 6px 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }}
-                .sub-author {{ margin: 0 0 12px 0; font-size: 12px; color: #38bdf8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }}
-                .header p {{ margin: 0; color: #94a3b8; font-size: 13px; font-weight: 500; }}
-                .header strong {{ color: #e2e8f0; }}
-                
-                .grid-kpi {{
-                    width: 100%;
-                    margin-bottom: 25px;
-                    border-collapse: separate;
-                    border-spacing: 12px;
-                    margin-left: -12px;
-                    margin-right: -12px;
-                }}
-
-                .card {{
-                    background: #ffffff;
-                    padding: 20px;
-                    border-radius: 6px;
-                    border: 1px solid #e2e8f0;
-                    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-                }}
-                
-                .util-card {{
-                    background: #f8fafc;
-                    border-left: 5px solid #e2e8f0;
-                }}
-                
-                .card-title {{
-                    font-size: 11px;
-                    text-transform: uppercase;
-                    font-weight: 600;
-                    color: #64748b;
-                    margin-bottom: 8px;
-                    letter-spacing: 0.5px;
-                }}
-                
-                .card-value {{
-                    font-size: 24px;
-                    font-weight: 700;
-                    color: #0f172a;
-                    letter-spacing: -0.5px;
-                }}
-                
-                .badge {{
-                    display: inline-block;
-                    padding: 3px 8px;
-                    border-radius: 12px;
-                    font-size: 11px;
-                    font-weight: 600;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                }}
-                .badge-success {{ background: #dcfce7; color: #166534; }}
-                .badge-danger {{ background: #fee2e2; color: #991b1b; }}
-                .badge-info {{ background: #e0f2fe; color: #0369a1; }}
-                
-                table.data-table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-top: 15px;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 4px;
-                    overflow: hidden;
-                }}
-                
-                table.data-table th, table.data-table td {{
-                    padding: 12px 15px;
-                    text-align: left;
-                    border-bottom: 1px solid #e2e8f0;
-                    font-size: 13px;
-                }}
-                
-                table.data-table th {{
-                    background-color: #f8fafc;
-                    font-weight: 600;
-                    text-transform: uppercase;
-                    color: #475569;
-                    font-size: 11px;
-                    letter-spacing: 0.5px;
-=======
                     font-family: 'Inter', Helvetica, Arial, sans-serif;
                     background-color: #f8fafc;
                     color: #0f172a;
@@ -919,123 +607,10 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                     background-color: #eff6ff;
                     border: 1px solid #bfdbfe;
                     color: #1d4ed8;
->>>>>>> d8bca66 (Reports Modified to show detailed agent performance with various metrics)
                 }}
-                
-                tr.row-alt {{ background-color: #fcfcfc; }}
-                
-                .section-title {{
-                    font-size: 16px;
-                    font-weight: 700;
-                    margin-top: 0;
-                    margin-bottom: 15px;
-                    color: #0f172a;
-                    border-bottom: 1px solid #e2e8f0;
-                    padding-bottom: 10px;
-                }}
-                
-                ul {{ margin: 0; padding-left: 20px; color: #475569; font-size: 13px; }}
-                li {{ margin-bottom: 6px; }}
             </style>
         </head>
         <body>
-<<<<<<< HEAD
-            <div class="header">
-                <h1>Enterprise SRE & IT Operations Intelligence Report</h1>
-                <div class="sub-author">Developed by Team Gamma (US SRE Pod)</div>
-                <p>Scope Target: <strong>{scope}</strong> | Date Range: <strong>{date_range}</strong> | Generated: {now_str}</p>
-            </div>
-            
-            <table class="grid-kpi">
-                <tr>
-                    <td width="33%">
-                        <div class="card">
-                            <div class="card-title">Total Handled</div>
-                            <div class="card-value">{total}</div>
-                        </div>
-                    </td>
-                    <td width="33%">
-                        <div class="card">
-                            <div class="card-title">SLA Compliance</div>
-                            <div class="card-value">
-                                {compliance}% 
-                                <span class="badge {'badge-success' if compliance >= 90 else 'badge-danger'}">
-                                    {breaches} Breaches
-                                </span>
-                            </div>
-                        </div>
-                    </td>
-                    <td width="33%">
-                        <div class="card">
-                            <div class="card-title">Avg Resolution</div>
-                            <div class="card-value">{avg_res} <span style="font-size:12px; color:#64748b;">Hrs</span></div>
-                        </div>
-                    </td>
-                </tr>
-                <tr>
-                    <td width="33%">
-                        <div class="card">
-                            <div class="card-title">Total Effort Spent</div>
-                            <div class="card-value">{total_effort} <span style="font-size:12px; color:#64748b;">Mins</span></div>
-                        </div>
-                    </td>
-                    <td width="33%">
-                        <div class="card">
-                            <div class="card-title">Service Requests (SR)</div>
-                            <div class="card-value">{total_sr}</div>
-                        </div>
-                    </td>
-                    <td width="33%">
-                        <div class="card">
-                            <div class="card-title">Incidents Resolved</div>
-                            <div class="card-value">{total_incidents}</div>
-                        </div>
-                    </td>
-                </tr>
-            </table>
-            
-            {agent_util_html}
-            
-            <div class="card" style="margin-bottom: 20px;">
-                <div class="section-title">Engineering Scorecard & AI Remarks</div>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Agent</th>
-                            <th>Perf Score</th>
-                            <th>Volume</th>
-                            <th>Avg Speed</th>
-                            <th>AI Strategic Review</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {agent_rows if agent_rows else '<tr><td colspan="5">No agent records found.</td></tr>'}
-                    </tbody>
-                </table>
-            </div>
-            
-            <table width="100%" style="border-collapse: collapse;">
-                <tr>
-                    <td width="50%" valign="top" style="padding-right: 8px;">
-                        <div class="card">
-                            <div class="section-title">Top Associated Companies</div>
-                            <ul>{dict_to_html_list(c_dist)}</ul>
-                        </div>
-                    </td>
-                    <td width="50%" valign="top" style="padding-left: 8px;">
-                        <div class="card">
-                            <div class="section-title">Workload Distribution</div>
-                            <ul>
-                                <li><strong>By Priority:</strong></li>
-                                <ul>{dict_to_html_list(p_dist)}</ul>
-                                <li style="margin-top: 6px;"><strong>By Type:</strong></li>
-                                <ul>{dict_to_html_list(t_dist)}</ul>
-                            </ul>
-                        </div>
-                    </td>
-                </tr>
-            </table>
-=======
             <div class="report-header">
                 <h1>Comprehensive Operations & Performance Report</h1>
                 <div class="sub-title">IT Service Management & Incident Resolution Metrics</div>
@@ -1046,7 +621,7 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
                 </div>
             </div>
 
-            {exec_summary_html}
+            {summary_html}
             {sr_html}
             {inc_html}
             {res_perf_html}
@@ -1058,7 +633,6 @@ Format your response as a strict JSON dictionary mapping the agent's name to the
             <div style="text-align: center; margin-top: 40px; font-size: 10px; color: #94a3b8;">
                 End of Report • Generated automatically from source operations data.
             </div>
->>>>>>> d8bca66 (Reports Modified to show detailed agent performance with various metrics)
         </body>
         </html>
         """

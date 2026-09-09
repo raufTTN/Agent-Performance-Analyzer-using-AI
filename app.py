@@ -416,9 +416,6 @@ if avg_res_hours is not None and not pd.isna(avg_res_hours):
     c4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
 
 
-<<<<<<< HEAD
-# Section 3: SLA Compliance Target Ticket Data Grid
-=======
 # Section 2.5: Shift Volume Distribution
 if "created_dt" in filtered_df.columns:
     filtered_df["shift"] = filtered_df["created_dt"].apply(AutomatedReportGenerator.get_shift)
@@ -455,7 +452,6 @@ else:
 
 
 # Section 4: SLA Compliance Target Ticket Data Grid
->>>>>>> 9975b0b (Fixing the ticket export field issue, it will only use the relevant columns which will be required from all fields ticket dump in runtime)
 st.markdown("---")
 st.subheader("📋 SLA Inception Status Tracking Tables")
 
