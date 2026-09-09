@@ -31,6 +31,52 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    /* CSS Variables for Enterprise Theme */
+    :root {
+        --bg-color: #0B0E14;
+        --card-bg: #151921;
+        --text-primary: #F8FAFC;
+        --text-secondary: #8B949E;
+        --border-color: rgba(255,255,255,0.08);
+        --accent-blue: #3B82F6;
+        --accent-green: #10B981;
+        --accent-red: #EF4444;
+        --accent-yellow: #F59E0B;
+        --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    /* Global App Background & Typography */
+    .stApp {
+        background-color: var(--bg-color);
+        font-family: var(--font-family);
+    }
+    
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background-color: var(--card-bg) !important;
+        border-right: 1px solid var(--border-color);
+    }
+    
+    /* Hide Streamlit Branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Premium Cards */
+    .premium-card {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 24px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        transition: transform 0.2s ease, border-color 0.2s ease;
+        margin-bottom: 1rem;
+    }
+    .premium-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255,255,255,0.2);
+    }
+    
     /* Fix sidebar scrolling */
     [data-testid="stSidebarUserContent"], [data-testid="stSidebarNav"] {
         overflow-y: auto !important;
@@ -63,7 +109,17 @@ def run_system_sync_sequence(csv_paths):
 
 
 # --- SIDEBAR CONTROL FILTERS ---
-st.sidebar.header("🎛️ Operations Control Panel")
+st.sidebar.markdown(
+    """
+    <div style="padding: 10px 0 20px 0;">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 600; color: var(--text-primary);">🎛️ Operations Control</h2>
+        <p style="margin: 4px 0 0 0; color: var(--text-secondary); font-size: 12px;">Global filter orchestration & sync</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.sidebar.markdown("<h3 style='font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;'>Data Sources</h3>", unsafe_allow_html=True)
 
 # Discover CSV datasets dynamically from DATA_DIR
 csv_files = sorted([f.name for f in DATA_DIR.glob("*.csv")]) if DATA_DIR.exists() else []
@@ -73,16 +129,20 @@ if not csv_files:
 else:
     st.sidebar.caption(f"Found {len(csv_files)} dataset(s):")
     for f in csv_files:
-        st.sidebar.text(f"📄 {f}")
+        st.sidebar.markdown(f"<div style='background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-bottom: 5px; border: 1px solid rgba(255,255,255,0.05);'>📄 <code>{f}</code></div>", unsafe_allow_html=True)
         
     csv_paths = [str(DATA_DIR / f) for f in csv_files]
 
-    if st.sidebar.button("🔄 Sync All Datasets", key="sync_selected_dataset_btn"):
+    st.sidebar.write("")
+    if st.sidebar.button("🔄 Sync All Datasets", key="sync_selected_dataset_btn", use_container_width=True):
         with st.spinner(f"Syncing {len(csv_files)} files into unified dataset..."):
             run_system_sync_sequence(csv_paths)
 
         st.sidebar.success("✅ Local database synchronized successfully.")
         st.rerun()
+
+st.sidebar.write("")
+st.sidebar.markdown("<h3 style='font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-top: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;'>Dashboard Filters</h3>", unsafe_allow_html=True)
 
 # Read staging frame out of relational database storage
 with get_db_connection() as conn:
@@ -228,10 +288,25 @@ rankings_df = OperationsLeaderboardScorer.compile_weighted_rankings(
 )
 
 # --- MAIN RENDER FRAME UI ---
-st.title("🛡️ Enterprise SRE & IT Operations Intelligence Platform")
-st.markdown("<small style='color: #38bdf8; font-weight: 600;'>Developed by Team Gamma (US SRE Pod)</small>", unsafe_allow_html=True)
-st.caption(
-    f"Agent Performance Analyzer Module Pipeline | Node: Air-Gapped Local | Model Active: `{OLLAMA_MODEL}`"
+st.markdown(
+    f"""
+    <div style="padding: 1rem 0 1.5rem 0; display: flex; align-items: center; gap: 15px; margin-bottom: 1.5rem;">
+        <div style="background: linear-gradient(135deg, var(--accent-blue), #818cf8); padding: 12px; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
+            <span style="font-size: 28px; line-height: 1;">🛡️</span>
+        </div>
+        <div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <h1 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Enterprise SRE & IT Operations Intelligence Platform</h1>
+                <span style="background: rgba(16, 185, 129, 0.1); color: var(--accent-green); padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.2);">LIVE</span>
+            </div>
+            <p style="margin: 4px 0 0 0; color: var(--text-secondary); font-size: 13px;">
+                Agent Performance Analyzer Pipeline • Node: Air-Gapped Local • Model Active: <code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">{OLLAMA_MODEL}</code>
+            </p>
+            <p style="margin: 4px 0 0 0; color: #38bdf8; font-size: 12px; font-weight: 600;">Developed by Team Gamma (US SRE Pod)</p>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
 # --- REFINEMENT WORKSPACE: MONTH-WISE HISTORICAL CHAMPIONS TRACKER ---
@@ -308,19 +383,28 @@ st.markdown("---")
 h1, h2 = st.columns(2)
 
 with h1:
-    st.markdown("### 🏆 Scoped Team Top Performer")
     if not rankings_df.empty:
         top_agent = rankings_df.iloc[0]
-        st.success(
-            f"**{top_agent['agent']}** leading the active view bounds with an efficiency score of **{top_agent['Performance_Score']}%** across **{top_agent['Tickets_Handled']}** cases."
-        )
+        st.markdown(f"""
+        <div class="premium-card">
+            <h4 style="margin: 0 0 10px 0; color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">🏆 Scoped Team Top Performer</h4>
+            <h2 style="margin: 0; font-size: 24px; color: var(--text-primary);">{top_agent['agent']}</h2>
+            <div style="display: flex; gap: 15px; margin-top: 15px;">
+                <div>
+                    <span style="display: block; font-size: 11px; color: var(--text-secondary);">Efficiency Score</span>
+                    <span style="font-size: 16px; font-weight: 600; color: var(--accent-green);">{top_agent['Performance_Score']}%</span>
+                </div>
+                <div>
+                    <span style="display: block; font-size: 11px; color: var(--text-secondary);">Tickets Handled</span>
+                    <span style="font-size: 16px; font-weight: 600; color: var(--text-primary);">{top_agent['Tickets_Handled']}</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        st.caption(
-            "Insufficient performance scoring records to establish metrics leadership bounds."
-        )
+        st.caption("Insufficient performance scoring records to establish metrics leadership bounds.")
 
 with h2:
-    st.markdown("### ⚡ Scoped Fastest Ticket Resolver")
     if not rankings_df.empty:
         valid_resolvers = rankings_df[rankings_df["Tickets_Handled"] >= 5]
         if valid_resolvers.empty:
@@ -328,9 +412,18 @@ with h2:
         fastest_agent = valid_resolvers.sort_values(
             by="Avg_Resolution_Hours", ascending=True
         ).iloc[0]
-        st.info(
-            f"**{fastest_agent['agent']}** leading response operations with a handling speed averaging **{fastest_agent['Avg_Resolution_Hours']} Hours** per ticket."
-        )
+        st.markdown(f"""
+        <div class="premium-card">
+            <h4 style="margin: 0 0 10px 0; color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">⚡ Scoped Fastest Ticket Resolver</h4>
+            <h2 style="margin: 0; font-size: 24px; color: var(--text-primary);">{fastest_agent['agent']}</h2>
+            <div style="display: flex; gap: 15px; margin-top: 15px;">
+                <div>
+                    <span style="display: block; font-size: 11px; color: var(--text-secondary);">Avg. Resolution</span>
+                    <span style="font-size: 16px; font-weight: 600; color: var(--accent-blue);">{fastest_agent['Avg_Resolution_Hours']} Hrs / Ticket</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     else:
         st.caption(
             "Insufficient execution duration footprints mapped to extract speed parameters."
@@ -360,23 +453,27 @@ weekly_effort_rate = total_effort_hrs / weeks_count if weeks_count > 0 else 0
 monthly_effort_capacity = total_effort_hrs / months_count if months_count > 0 else 0
 avg_effort_mins = pd.to_numeric(filtered_df["effort_mins"], errors="coerce").mean() if "effort_mins" in filtered_df.columns else 0
 
-st.write("")
-c1, c2, c3 = st.columns(3)
-c1.metric("Total Tickets", f"{len(filtered_df):,}")
-c2.metric("SLA Compliance Rate Percentage", f"{sla_metrics['compliance_pct']}%")
-c3.metric(
-    "Total SLA Resolution Breaches",
-    f"{sla_metrics['breach_count']} Failed",
-    delta_color="inverse",
-)
+def render_kpi_card(title, value, accent_color, subtitle=""):
+    return f"""
+    <div class="premium-card" style="padding: 16px;">
+        <h4 style="margin: 0 0 8px 0; color: var(--text-secondary); font-size: 12px; font-weight: 500;">{title}</h4>
+        <h2 style="margin: 0; font-size: 28px; font-weight: 600; color: var(--text-primary);">{value}</h2>
+        <span style="font-size: 12px; color: {accent_color}; font-weight: 500;">{subtitle}</span>
+    </div>
+    """
 
 st.write("")
+c1, c2, c3 = st.columns(3)
+with c1: st.markdown(render_kpi_card("Total Tickets", f"{len(filtered_df):,}", "var(--text-secondary)", ""), unsafe_allow_html=True)
+with c2: st.markdown(render_kpi_card("SLA Compliance Rate Percentage", f"{sla_metrics['compliance_pct']}%", "var(--accent-green)", ""), unsafe_allow_html=True)
+with c3: st.markdown(render_kpi_card("Total SLA Resolution Breaches", f"{sla_metrics['breach_count']}", "var(--accent-red)", "Failed"), unsafe_allow_html=True)
+
 st.write("")
 c4, c5, c6, c7 = st.columns(4)
-c4.metric("Pod Total Effort (US SRE)", f"{total_effort_hrs:.1f} Hrs")
-c5.metric("Weekly Effort Rate", f"{weekly_effort_rate:.1f} Hrs/Wk")
-c6.metric("Monthly Effort Capacity", f"{monthly_effort_capacity:.1f} Hrs/Mo")
-c7.metric("Avg Effort Per Ticket", f"{avg_effort_mins:.1f} Mins")
+with c4: st.markdown(render_kpi_card("Pod Total Effort (US SRE)", f"{total_effort_hrs:.1f} Hrs", "var(--text-secondary)", ""), unsafe_allow_html=True)
+with c5: st.markdown(render_kpi_card("Weekly Effort Rate", f"{weekly_effort_rate:.1f} Hrs/Wk", "var(--text-secondary)", ""), unsafe_allow_html=True)
+with c6: st.markdown(render_kpi_card("Monthly Effort Capacity", f"{monthly_effort_capacity:.1f} Hrs/Mo", "var(--text-secondary)", ""), unsafe_allow_html=True)
+with c7: st.markdown(render_kpi_card("Avg Effort Per Ticket", f"{avg_effort_mins:.1f} Mins", "var(--text-secondary)", ""), unsafe_allow_html=True)
 
 
 
@@ -402,7 +499,18 @@ if not pod_util_df.empty:
         "pod_share_pct": "Pod Workload Share (%)",
         "top_projects": "Project / Account Allocations (Hours)"
     })
-    st.dataframe(display_util, use_container_width=True, hide_index=True)
+    
+    def highlight_utilization(val):
+        try:
+            v = float(str(val).replace('%', ''))
+            if v > 95: return 'color: #ef4444; font-weight: bold'
+            if v < 60: return 'color: #f59e0b; font-weight: bold'
+            return 'color: #10b981; font-weight: bold'
+        except:
+            return ''
+
+    styled_util = display_util.style.map(highlight_utilization, subset=['Utilization (%)'])
+    st.dataframe(styled_util, use_container_width=True, hide_index=True)
 else:
     st.caption("No individual pod utilization records available in current scope.")
 
@@ -440,6 +548,17 @@ compliant_records = filtered_df[filtered_df["sla_breached"] == 0][
     available_columns
 ].rename(columns=rename_map)
 
+def style_severity(val):
+    val_str = str(val).lower()
+    if any(x in val_str for x in ['urgent', 'high', 'p0', 'p1']): return 'color: #ef4444; font-weight: 600;'
+    if any(x in val_str for x in ['medium', 'p2']): return 'color: #f59e0b; font-weight: 600;'
+    return 'color: #10b981; font-weight: 600;'
+
+def style_state(val):
+    val_str = str(val).lower()
+    if any(x in val_str for x in ['closed', 'resolved']): return 'color: #10b981; font-weight: 600;'
+    return 'color: #3b82f6; font-weight: 600;'
+
 tab_compliant, tab_breached = st.tabs(
     ["🟢 Within SLA (Compliant)", "🔴 Breached SLA (Failed Target)"]
 )
@@ -449,7 +568,8 @@ with tab_compliant:
         f"**Showing {len(compliant_records):,} tickets keeping within strict SRE milestone parameters:**"
     )
     if not compliant_records.empty:
-        st.dataframe(compliant_records, width=1200, hide_index=True)
+        styled_comp = compliant_records.style.map(style_severity, subset=['Severity Level']).map(style_state, subset=['State Status'])
+        st.dataframe(styled_comp, use_container_width=True, hide_index=True)
     else:
         st.caption("No compliant records encountered in current scope parameters.")
 
@@ -458,7 +578,8 @@ with tab_breached:
         f"**Showing {len(breached_records):,} high-exposure tickets breaking corporate delivery timelines:**"
     )
     if not breached_records.empty:
-        st.dataframe(breached_records, width=1200, hide_index=True)
+        styled_breach = breached_records.style.map(style_severity, subset=['Severity Level']).map(style_state, subset=['State Status'])
+        st.dataframe(styled_breach, use_container_width=True, hide_index=True)
     else:
         st.info(
             "🎉 Operational excellence confirmed! Zero SLA resolution breaches mapped under current view filters."
@@ -487,11 +608,39 @@ if st.button("🔮 Analyze Infrastructure Noise Clusters & Security Exposure", k
                     "Target Company Context": "Company Name",
                     "Total Occurrence Count": "Frequency Count"
                 })
-                st.dataframe(alerts_df, use_container_width=True, hide_index=True)
+                
+                # Apply subtle styling to the Top 5 alerts table
+                def highlight_high_frequency(val):
+                    try:
+                        if int(val) > 10: return 'color: #f59e0b; font-weight: bold'
+                        return 'color: #3b82f6;'
+                    except: return ''
+                
+                styled_alerts = alerts_df.style.map(highlight_high_frequency, subset=['Frequency Count'])
+                st.dataframe(styled_alerts, use_container_width=True, hide_index=True)
                 
                 st.markdown("#### 🧠 AI Security & Efficiency Impact Summary")
-                with st.expander("View Strategic Insights", expanded=True):
-                    st.info(strategic_review["insights"])
+                
+                raw_insights = strategic_review["insights"]
+                # Visually style the prompt-requested bracketed sections without changing the text
+                styled_insights = raw_insights.replace(
+                    "[EFFICIENCY BOTTLENECK ANALYSIS]", 
+                    "<h4 style='color: var(--accent-yellow); margin-top: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;'>⚙️ EFFICIENCY BOTTLENECK ANALYSIS</h4>"
+                ).replace(
+                    "[SECURITY POSTURE ASSESSMENT]", 
+                    "<h4 style='color: var(--accent-red); margin-top: 24px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;'>🛡️ SECURITY POSTURE ASSESSMENT</h4>"
+                ).replace(
+                    "[AUTOMATION PLAYBOOK RECOMMENDATIONS]", 
+                    "<h4 style='color: var(--accent-green); margin-top: 24px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;'>✅ AUTOMATION PLAYBOOK RECOMMENDATIONS</h4>"
+                )
+                
+                st.markdown(f"""
+                <div class="premium-card" style="border-top: 4px solid var(--accent-blue);">
+                    <div style="color: var(--text-primary); font-size: 14px; line-height: 1.6;">
+                        {styled_insights}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
         else:
             st.info(strategic_review)
 
