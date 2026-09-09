@@ -53,9 +53,11 @@ st.markdown(
 )
 
 
-def run_system_sync_sequence(csv_path):
-    if Path(csv_path).exists():
-        LegacyDataStagingGateway.seed_database_from_csv(csv_path)
+def run_system_sync_sequence(csv_paths):
+    for i, csv_path in enumerate(csv_paths):
+        if Path(csv_path).exists():
+            clear_db = (i == 0)
+            LegacyDataStagingGateway.seed_database_from_csv(csv_path, clear_db=clear_db)
 
     CoreSLADiagnosticEngine.execute_global_sla_audit()
 
@@ -68,22 +70,16 @@ csv_files = sorted([f.name for f in DATA_DIR.glob("*.csv")]) if DATA_DIR.exists(
 
 if not csv_files:
     st.sidebar.warning("No CSV files found in the data directory.")
-    selected_csv_path = None
 else:
-    # Set default selection index to 'tickets.csv' if present
-    default_idx = 0
-    if "tickets.csv" in csv_files:
-        default_idx = csv_files.index("tickets.csv")
+    st.sidebar.caption(f"Found {len(csv_files)} dataset(s):")
+    for f in csv_files:
+        st.sidebar.text(f"📄 {f}")
+        
+    csv_paths = [str(DATA_DIR / f) for f in csv_files]
 
-    selected_csv = st.sidebar.selectbox("📂 Select CSV Dataset", csv_files, index=default_idx)
-    selected_csv_path = DATA_DIR / selected_csv
-    st.session_state["selected_csv"] = str(selected_csv_path)
-
-    st.sidebar.caption(f"Selected Dataset: **{selected_csv}**")
-
-    if st.sidebar.button("🔄 Sync Selected Dataset", key="sync_selected_dataset_btn"):
-        with st.spinner(f"Syncing {selected_csv}..."):
-            run_system_sync_sequence(str(selected_csv_path))
+    if st.sidebar.button("🔄 Sync All Datasets", key="sync_selected_dataset_btn"):
+        with st.spinner(f"Syncing {len(csv_files)} files into unified dataset..."):
+            run_system_sync_sequence(csv_paths)
 
         st.sidebar.success("✅ Local database synchronized successfully.")
         st.rerun()
@@ -340,71 +336,32 @@ with h2:
             "Insufficient execution duration footprints mapped to extract speed parameters."
         )
 
-# Section 1.5: Agent Utilization Profile (if specific agent selected)
-if selected_agent != "All Agents" and not team_utilization_df.empty:
-    st.markdown("---")
-    st.subheader("📊 Agent Capacity & Utilization Profile")
-    agent_util_row = team_utilization_df[team_utilization_df['agent'] == selected_agent]
-    
-    if not agent_util_row.empty:
-        row_data = agent_util_row.iloc[0]
-        
-        # Format effort to hours and mins
-        total_mins = int(row_data['Total_Effort_Mins'])
-        hrs, mins = divmod(total_mins, 60)
-        effort_str = f"{hrs}h {mins}m"
-        
-        tickets = int(row_data['Total_Tickets'])
-        status = row_data['Utilization_Status']
-        
-        if status == "Underutilized":
-            status_color = "#eab308" # Yellow
-        elif status == "Overutilized":
-            status_color = "#ef4444" # Red
-        else:
-            status_color = "#22c55e" # Green
-            
-        uc1, uc2, uc3 = st.columns(3)
-        with uc1:
-            st.markdown(f"""
-            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center;">
-                <h4 style="margin:0; color: #94a3b8; font-size: 14px;">Total Effort Logged</h4>
-                <h2 style="margin: 10px 0 0 0; font-size: 28px; color: #f8fafc;">{effort_str}</h2>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with uc2:
-            st.markdown(f"""
-            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center;">
-                <h4 style="margin:0; color: #94a3b8; font-size: 14px;">Total Tickets Handled</h4>
-                <h2 style="margin: 10px 0 0 0; font-size: 28px; color: #f8fafc;">{tickets}</h2>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with uc3:
-            st.markdown(f"""
-            <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center;">
-                <h4 style="margin:0; color: #94a3b8; font-size: 14px;">Utilization Status</h4>
-                <h2 style="margin: 10px 0 0 0; font-size: 24px; color: {status_color};">{status}</h2>
-            </div>
-            """, unsafe_allow_html=True)
-
 # Section 2: Executive KPI Cards Grid
 st.markdown("---")
+st.subheader("📊 Agent Capacity & Utilization Profile")
 sla_metrics = CoreSLADiagnosticEngine.fetch_sla_summary(filtered_df)
-avg_effort = (
-    filtered_df["effort_mins"].mean() if "effort_mins" in filtered_df.columns else 0
-)
-if selected_type == "All Types (SR & Incident)":
-    avg_res_hours = None
-else:
-    avg_res_hours = (
-        filtered_df["resolution_hours"].mean()
-        if "resolution_hours" in filtered_df.columns
-        else None
-    )
 
-c1, c2, c3, c4 = st.columns(4)
+if "effort_mins" in filtered_df.columns:
+    filtered_df["effort_hours"] = pd.to_numeric(filtered_df["effort_mins"], errors="coerce").fillna(0) / 60.0
+else:
+    filtered_df["effort_hours"] = 0.0
+
+total_effort_hrs = filtered_df["effort_hours"].sum()
+
+if "created_dt" in filtered_df.columns:
+    valid_dates = filtered_df.dropna(subset=["created_dt"])
+    weeks_count = valid_dates["created_dt"].dt.to_period("W").nunique() if not valid_dates.empty else 1
+    months_count = valid_dates["created_dt"].dt.to_period("M").nunique() if not valid_dates.empty else 1
+else:
+    weeks_count = 1
+    months_count = 1
+
+weekly_effort_rate = total_effort_hrs / weeks_count if weeks_count > 0 else 0
+monthly_effort_capacity = total_effort_hrs / months_count if months_count > 0 else 0
+avg_effort_mins = pd.to_numeric(filtered_df["effort_mins"], errors="coerce").mean() if "effort_mins" in filtered_df.columns else 0
+
+st.write("")
+c1, c2, c3 = st.columns(3)
 c1.metric("Total Tickets", f"{len(filtered_df):,}")
 c2.metric("SLA Compliance Rate Percentage", f"{sla_metrics['compliance_pct']}%")
 c3.metric(
@@ -412,18 +369,17 @@ c3.metric(
     f"{sla_metrics['breach_count']} Failed",
     delta_color="inverse",
 )
-if avg_res_hours is not None and not pd.isna(avg_res_hours):
-    c4.metric("Avg Resolution Duration", f"{avg_res_hours:.1f} Hours")
+
+st.write("")
+st.write("")
+c4, c5, c6, c7 = st.columns(4)
+c4.metric("Pod Total Effort (US SRE)", f"{total_effort_hrs:.1f} Hrs")
+c5.metric("Weekly Effort Rate", f"{weekly_effort_rate:.1f} Hrs/Wk")
+c6.metric("Monthly Effort Capacity", f"{monthly_effort_capacity:.1f} Hrs/Mo")
+c7.metric("Avg Effort Per Ticket", f"{avg_effort_mins:.1f} Mins")
 
 
-# Section 2.5: Shift Volume Distribution
-if "created_dt" in filtered_df.columns:
-    filtered_df["shift"] = filtered_df["created_dt"].apply(AutomatedReportGenerator.get_shift)
-    st.markdown("---")
-    st.subheader("Ticket Volume Distribution by Shift")
-    shift_counts = filtered_df["shift"].value_counts().reset_index()
-    shift_counts.columns = ["Shift", "Ticket Count"]
-    st.bar_chart(shift_counts.set_index("Shift"))
+
 
 
 # Section 3: Individual Engineer Time Utilization (US SRE Pod)

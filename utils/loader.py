@@ -83,17 +83,18 @@
 import pandas as pd
 from datetime import datetime
 from utils.db_manager import get_db_connection
+import re
 
 
 class LegacyDataStagingGateway:
     @staticmethod
-    def seed_database_from_csv(file_path: str) -> int:
+    def seed_database_from_csv(file_path: str, clear_db: bool = True) -> int:
         """Parses CSV rows and seeds SQLite with the selected dataset."""
         try:
             required_normalized = {
                 "createdtime", "resolvedtime", "subject", "description", "priority", "agent",
                 "resolutionapplied", "resolutionnote", "status", "effortrequiredtoresolve(inmins)",
-                "resolutionhours", "ticketid", "id", "group", "ticketgroup", "assignedgroup",
+                "resolutionhours", "resolutiontime(inhrs)", "ticketid", "id", "group", "ticketgroup", "assignedgroup",
                 "alarmsource", "source", "affectedci", "ci", "asset", "issuebucket", "bucket",
                 "tickettype", "type", "urgency", "company", "accountname", "category"
             }
@@ -108,9 +109,10 @@ class LegacyDataStagingGateway:
             with get_db_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Clear previous dataset to allow clean switching
-                cursor.execute("DELETE FROM tickets")
-                conn.commit()
+                if clear_db:
+                    # Clear previous dataset to allow clean switching
+                    cursor.execute("DELETE FROM tickets")
+                    conn.commit()
                 
                 now_str = datetime.utcnow().isoformat()
                 records_saved = 0
@@ -125,7 +127,7 @@ class LegacyDataStagingGateway:
                     )
 
                     res_hours_val = pd.to_numeric(
-                        row.get("Resolution Hours"), errors="coerce"
+                        row.get("Resolution Hours", row.get("Resolution Time (in Hrs)")), errors="coerce"
                     )
                     created_raw = row.get("Created Time")
                     resolved_raw = row.get("Resolved Time")
